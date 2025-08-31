@@ -171,12 +171,34 @@
   - Implement test coverage reporting and quality gates
   - _Requirements: 7.1, 7.2, 7.3_
 
-- [ ] 19. Integrate all components and finalize system
+- [ ] 19. Create Docker containerization setup
+  - Create multi-stage Dockerfile for Telegram bot service with Node.js 18 Alpine base
+  - Create separate Dockerfile for Next.js admin panel with optimized production build
+  - Set up Docker Compose configuration with PostgreSQL, Redis, Ollama, and Nginx services
+  - Configure Docker networks and volumes for data persistence and service communication
+  - Create development Docker Compose override for hot reloading and debugging
+  - Add health checks for all services to ensure proper startup order and monitoring
+  - Create environment variable templates and secure configuration management
+  - Write deployment scripts for production and development environments
+  - _Requirements: 7.1, 7.2, 7.3_
+
+- [ ] 20. Configure production Docker environment
+  - Set up Nginx reverse proxy configuration for admin panel and API routing
+  - Configure SSL/TLS certificates and HTTPS redirection for production security
+  - Implement Docker secrets management for sensitive environment variables
+  - Add Redis caching layer for session management and performance optimization
+  - Configure log aggregation and monitoring for all containerized services
+  - Set up automated backup strategies for PostgreSQL data and audio files
+  - Create Docker image optimization and security scanning in CI/CD pipeline
+  - Write production deployment and rollback procedures
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+
+- [ ] 21. Integrate all components and finalize system
   - Wire together all services and components in the main application
-  - Update dependency injection and service initialization
-  - Implement graceful shutdown and cleanup procedures
-  - Add health check endpoints for system monitoring
-  - Create database migration scripts for deployment
-  - Update documentation and deployment instructions
-  - Perform end-to-end system testing with real scenarios
+  - Update dependency injection and service initialization for containerized environment
+  - Implement graceful shutdown and cleanup procedures for Docker containers
+  - Add health check endpoints for system monitoring and container orchestration
+  - Create database migration scripts compatible with Docker deployment
+  - Update documentation with Docker setup and deployment instructions
+  - Perform end-to-end system testing with Docker Compose environment
   - _Requirements: 7.1, 7.2, 7.3, 7.4_

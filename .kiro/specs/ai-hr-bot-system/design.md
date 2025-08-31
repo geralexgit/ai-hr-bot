@@ -31,7 +31,7 @@ graph TB
     end
     
     subgraph "External Services"
-        OL[Ollama LLM]
+        LLM[LLM Provider - Ollama/Claude/OpenAI]
         STT[Speech-to-Text API]
     end
     
@@ -42,7 +42,7 @@ graph TB
     BH --> CS
     BH --> AS
     BH --> APS
-    AS --> OL
+    AS --> LLM
     APS --> STT
     VS --> DB
     CS --> DB
@@ -638,6 +638,111 @@ interface CommunicationMetrics {
    - Missing data: Request required information
    - Format errors: Show examples
 
+### LLM Provider Integration
+
+The system supports multiple LLM providers with a unified interface:
+
+```typescript
+interface LLMService {
+    generate(prompt: string, options?: LLMOptions): Promise<string>;
+    validateConnection(): Promise<boolean>;
+    getModelInfo(): Promise<ModelInfo>;
+}
+
+interface LLMOptions {
+    maxTokens?: number;
+    temperature?: number;
+    model?: string;
+}
+
+interface ModelInfo {
+    name: string;
+    provider: 'ollama' | 'claude' | 'openai' | 'azure';
+    maxTokens: number;
+    supportedFeatures: string[];
+}
+
+// Ollama Implementation
+class OllamaService implements LLMService {
+    async generate(prompt: string, options?: LLMOptions): Promise<string> {
+        const response = await fetch(`${this.baseUrl}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: options?.model || this.model,
+                prompt: prompt,
+                stream: false,
+                options: {
+                    temperature: options?.temperature || 0.7,
+                    num_predict: options?.maxTokens || 2048
+                }
+            })
+        });
+        const data = await response.json();
+        return data.response;
+    }
+}
+
+// Claude Implementation
+class ClaudeService implements LLMService {
+    async generate(prompt: string, options?: LLMOptions): Promise<string> {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-api-key': this.apiKey,
+                'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+                model: options?.model || 'claude-3-sonnet-20240229',
+                max_tokens: options?.maxTokens || 2048,
+                temperature: options?.temperature || 0.7,
+                messages: [{ role: 'user', content: prompt }]
+            })
+        });
+        const data = await response.json();
+        return data.content[0].text;
+    }
+}
+
+// OpenAI Implementation
+class OpenAIService implements LLMService {
+    async generate(prompt: string, options?: LLMOptions): Promise<string> {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.apiKey}`
+            },
+            body: JSON.stringify({
+                model: options?.model || 'gpt-4',
+                max_tokens: options?.maxTokens || 2048,
+                temperature: options?.temperature || 0.7,
+                messages: [{ role: 'user', content: prompt }]
+            })
+        });
+        const data = await response.json();
+        return data.choices[0].message.content;
+    }
+}
+
+// LLM Factory
+class LLMFactory {
+    static create(provider: string, config: any): LLMService {
+        switch (provider) {
+            case 'ollama':
+                return new OllamaService(config);
+            case 'claude':
+                return new ClaudeService(config);
+            case 'openai':
+                return new OpenAIService(config);
+            default:
+                throw new Error(`Unsupported LLM provider: ${provider}`);
+        }
+    }
+}
+```
+
 ### Error Handling Strategy
 
 ```typescript
@@ -645,6 +750,7 @@ class ErrorHandler {
     static async handleDatabaseError(error: DatabaseError, context: string): Promise<void>;
     static async handleExternalServiceError(error: ServiceError, fallback?: () => Promise<any>): Promise<any>;
     static async handleValidationError(error: ValidationError): Promise<string>;
+    static async handleLLMError(error: LLMError, provider: string): Promise<string>;
 }
 
 interface ErrorResponse {
@@ -654,6 +760,13 @@ interface ErrorResponse {
         message: string;
         details?: any;
     };
+}
+
+interface LLMError extends Error {
+    provider: string;
+    statusCode?: number;
+    rateLimited?: boolean;
+    quotaExceeded?: boolean;
 }
 ```
 
@@ -700,6 +813,448 @@ describe('Bot Integration', () => {
 - Authentication and authorization
 - Data encryption verification
 
+## Docker Containerization Architecture
+
+### Container Structure
+
+The system is designed to run in a multi-container Docker environment with the following services:
+
+```mermaid
+graph TB
+    subgraph "Docker Compose Environment"
+        subgraph "Application Containers"
+            BOT[Telegram Bot Service]
+            ADMIN[Admin Panel Service]
+            API[API Gateway/Backend]
+        end
+        
+        subgraph "Data Containers"
+            DB[(PostgreSQL Database)]
+            REDIS[(Redis Cache)]
+        end
+        
+        subgraph "External Services"
+            OLLAMA[Ollama LLM Service]
+            NGINX[Nginx Reverse Proxy]
+        end
+        
+        subgraph "Storage"
+            AUDIO[Audio Files Volume]
+            LOGS[Logs Volume]
+        end
+    end
+    
+    BOT --> API
+    ADMIN --> API
+    API --> DB
+    API --> REDIS
+    API --> OLLAMA
+    NGINX --> BOT
+    NGINX --> ADMIN
+    API --> AUDIO
+    BOT --> LOGS
+    ADMIN --> LOGS
+```
+
+### Docker Configuration Files
+
+**Main Dockerfile (Telegram Bot)**
+```dockerfile
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+RUN npm ci --only=production
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Production image, copy all the files and run the app
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 botuser
+
+# Copy built application
+COPY --from=builder --chown=botuser:nodejs /app/dist ./dist
+COPY --from=builder --chown=botuser:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=botuser:nodejs /app/package.json ./package.json
+
+# Create directories for file storage
+RUN mkdir -p /app/storage/audio && chown -R botuser:nodejs /app/storage
+
+USER botuser
+
+EXPOSE 3000
+
+ENV PORT 3000
+
+CMD ["node", "dist/app.js"]
+```
+
+**Admin Panel Dockerfile**
+```dockerfile
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+COPY admin-panel/package.json admin-panel/package-lock.json* ./
+RUN npm ci --only=production
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY admin-panel/ .
+
+ENV NEXT_TELEMETRY_DISABLED 1
+
+RUN npm run build
+
+# Production image, copy all the files and run Next.js
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+CMD ["node", "server.js"]
+```
+
+**Docker Compose Configuration**
+```yaml
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: hr-bot-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hr_bot}
+      POSTGRES_USER: ${DB_USER:-hr_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - hr-bot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-hr_user} -d ${DB_NAME:-hr_bot}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: hr-bot-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - hr-bot-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ollama LLM Service
+  ollama:
+    image: ollama/ollama:latest
+    container_name: hr-bot-ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - hr-bot-network
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Telegram Bot Service
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hr-bot-telegram
+    environment:
+      - NODE_ENV=production
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DATABASE_URL=postgresql://${DB_USER:-hr_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_bot}
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma2:latest}
+      - SPEECH_TO_TEXT_API_KEY=${SPEECH_TO_TEXT_API_KEY}
+      - AUDIO_STORAGE_PATH=/app/storage/audio
+    volumes:
+      - audio_files:/app/storage/audio
+      - bot_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - hr-bot-network
+    restart: unless-stopped
+
+  # Admin Panel Service
+  admin-panel:
+    build:
+      context: .
+      dockerfile: admin-panel/Dockerfile
+    container_name: hr-bot-admin
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER:-hr_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_bot}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3001}
+      - API_BASE_URL=http://telegram-bot:3000
+    ports:
+      - "3001:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      telegram-bot:
+        condition: service_started
+    networks:
+      - hr-bot-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: hr-bot-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - admin-panel
+    networks:
+      - hr-bot-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:
+  audio_files:
+  bot_logs:
+
+networks:
+  hr-bot-network:
+    driver: bridge
+```
+
+**Environment Configuration (.env.production)**
+```bash
+# Database Configuration
+DB_NAME=hr_bot
+DB_USER=hr_user
+DB_PASSWORD=your_secure_password_here
+
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# LLM Configuration
+LLM_PROVIDER=claude  # Options: ollama, claude, openai, azure
+LLM_MODEL=claude-3-sonnet-20240229
+LLM_API_KEY=your_claude_api_key_here  # Required for external providers
+LLM_MAX_TOKENS=2048
+LLM_TEMPERATURE=0.7
+
+# Ollama Configuration (only if LLM_PROVIDER=ollama)
+OLLAMA_BASE_URL=http://ollama:11434
+
+# Speech-to-Text Configuration
+SPEECH_TO_TEXT_PROVIDER=google
+SPEECH_TO_TEXT_API_KEY=your_speech_api_key_here
+
+# Admin Panel Configuration
+NEXTAUTH_SECRET=your_nextauth_secret_here
+NEXTAUTH_URL=http://localhost:3001
+
+# Security
+JWT_SECRET=your_jwt_secret_here
+
+# Redis Configuration
+REDIS_URL=redis://redis:6379
+REDIS_TTL=3600NAME=hr_bot
+DB_USER=hr_user
+DB_PASSWORD=your_secure_password_here
+
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# Ollama Configuration
+OLLAMA_MODEL=gemma2:latest
+
+# Speech-to-Text Configuration
+SPEECH_TO_TEXT_PROVIDER=google
+SPEECH_TO_TEXT_API_KEY=your_speech_api_key_here
+
+# Admin Panel Configuration
+NEXTAUTH_SECRET=your_nextauth_secret_here
+NEXTAUTH_URL=http://localhost:3001
+
+# Security
+JWT_SECRET=your_jwt_secret_here
+```
+
+**Nginx Configuration**
+```nginx
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream admin_panel {
+        server admin-panel:3000;
+    }
+
+    server {
+        listen 80;
+        server_name localhost;
+
+        # Admin Panel
+        location / {
+            proxy_pass http://admin_panel;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+
+        # Health check endpoint
+        location /health {
+            access_log off;
+            return 200 "healthy\n";
+            add_header Content-Type text/plain;
+        }
+    }
+}
+```
+
+### Development Docker Configuration
+
+**docker-compose.dev.yml**
+```yaml
+version: '3.8'
+
+services:
+  postgres:
+    extends:
+      file: docker-compose.yml
+      service: postgres
+    ports:
+      - "5432:5432"
+
+  redis:
+    extends:
+      file: docker-compose.yml
+      service: redis
+    ports:
+      - "6379:6379"
+
+  ollama:
+    extends:
+      file: docker-compose.yml
+      service: ollama
+    ports:
+      - "11434:11434"
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: hr-bot-telegram-dev
+    environment:
+      - NODE_ENV=development
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DATABASE_URL=postgresql://${DB_USER:-hr_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_bot}
+      - REDIS_URL=redis://redis:6379
+      - OLLAMA_BASE_URL=http://ollama:11434
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - audio_files:/app/storage/audio
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    depends_on:
+      - postgres
+      - redis
+      - ollama
+    networks:
+      - hr-bot-network
+
+  admin-panel:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile.dev
+    container_name: hr-bot-admin-dev
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://${DB_USER:-hr_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_bot}
+    volumes:
+      - ./admin-panel:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"
+    command: npm run dev
+    depends_on:
+      - postgres
+    networks:
+      - hr-bot-network
+```
+
 ## Configuration Management
 
 ### Environment Variables
@@ -717,10 +1272,17 @@ interface Config {
         token: string;
         webhookUrl?: string;
     };
-    ollama: {
-        baseUrl: string;
+    llm: {
+        provider: 'ollama' | 'claude' | 'openai' | 'azure';
+        // Ollama configuration
+        baseUrl?: string;
         model: string;
         timeout: number;
+        // External LLM configuration
+        apiKey?: string;
+        region?: string;
+        maxTokens?: number;
+        temperature?: number;
     };
     speechToText: {
         provider: 'google' | 'azure' | 'aws';
@@ -735,7 +1297,42 @@ interface Config {
         jwtSecret: string;
         sessionTimeout: number;
     };
+    redis: {
+        url: string;
+        ttl: number;
+    };
 }
 ```
 
-This design provides a robust foundation for implementing the comprehensive AI HR Bot system while maintaining the existing codebase structure and extending it with the required functionality.
+### Docker Deployment Scripts
+
+**scripts/deploy.sh**
+```bash
+#!/bin/bash
+set -e
+
+echo "🚀 Deploying HR Bot System..."
+
+# Pull latest images
+docker-compose pull
+
+# Build and start services
+docker-compose up -d --build
+
+# Wait for services to be healthy
+echo "⏳ Waiting for services to be ready..."
+docker-compose exec postgres pg_isready -U hr_user -d hr_bot
+docker-compose exec redis redis-cli ping
+
+# Run database migrations
+echo "📊 Running database migrations..."
+docker-compose exec telegram-bot npm run migrate
+
+# Check service health
+echo "🔍 Checking service health..."
+docker-compose ps
+
+echo "✅ Deployment complete!"
+```
+
+This design provides a robust, scalable, and maintainable Docker-based deployment architecture for the comprehensive AI HR Bot system.
