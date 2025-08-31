@@ -209,6 +209,336 @@ interface AudioProcessingResult {
 }
 ```
 
+### Admin Panel Architecture (Next.js + TypeScript + Tailwind)
+
+The admin panel is built as a separate Next.js application with the following structure:
+
+```
+admin-panel/
+├── src/
+│   ├── app/                    # App Router (Next.js 13+)
+│   │   ├── (auth)/
+│   │   │   ├── login/
+│   │   │   └── layout.tsx
+│   │   ├── dashboard/
+│   │   │   ├── page.tsx
+│   │   │   └── layout.tsx
+│   │   ├── vacancies/
+│   │   │   ├── page.tsx
+│   │   │   ├── [id]/
+│   │   │   ├── create/
+│   │   │   └── edit/[id]/
+│   │   ├── candidates/
+│   │   │   ├── page.tsx
+│   │   │   ├── [id]/
+│   │   │   └── evaluations/
+│   │   ├── reports/
+│   │   │   ├── page.tsx
+│   │   │   └── analytics/
+│   │   ├── api/                # API Routes
+│   │   │   ├── auth/
+│   │   │   ├── vacancies/
+│   │   │   ├── candidates/
+│   │   │   └── evaluations/
+│   │   ├── globals.css
+│   │   └── layout.tsx
+│   ├── components/
+│   │   ├── ui/                 # Reusable UI components
+│   │   │   ├── Button.tsx
+│   │   │   ├── Card.tsx
+│   │   │   ├── Modal.tsx
+│   │   │   ├── Table.tsx
+│   │   │   ├── Form.tsx
+│   │   │   └── Charts.tsx
+│   │   ├── layout/
+│   │   │   ├── Sidebar.tsx
+│   │   │   ├── Header.tsx
+│   │   │   └── Navigation.tsx
+│   │   ├── vacancies/
+│   │   │   ├── VacancyForm.tsx
+│   │   │   ├── VacancyList.tsx
+│   │   │   └── VacancyCard.tsx
+│   │   ├── candidates/
+│   │   │   ├── CandidateList.tsx
+│   │   │   ├── CandidateProfile.tsx
+│   │   │   └── EvaluationReport.tsx
+│   │   └── dashboard/
+│   │       ├── StatsCards.tsx
+│   │       ├── RecentActivity.tsx
+│   │       └── Charts.tsx
+│   ├── lib/
+│   │   ├── api.ts              # API client
+│   │   ├── auth.ts             # Authentication utilities
+│   │   ├── utils.ts            # Utility functions
+│   │   └── validations.ts      # Form validation schemas
+│   ├── types/
+│   │   ├── api.ts              # API response types
+│   │   ├── auth.ts             # Authentication types
+│   │   └── models.ts           # Data model types
+│   └── hooks/
+│       ├── useAuth.ts
+│       ├── useApi.ts
+│       └── useLocalStorage.ts
+├── public/
+├── tailwind.config.js
+├── next.config.js
+└── package.json
+```
+
+#### Key Components Design
+
+**Dashboard Layout**
+```typescript
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+}
+
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Sidebar />
+      <div className="lg:pl-64">
+        <Header />
+        <main className="py-6">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+};
+```
+
+**Vacancy Management Interface**
+```typescript
+interface VacancyFormData {
+  title: string;
+  description: string;
+  requirements: {
+    technicalSkills: RequiredSkill[];
+    experience: ExperienceRequirement[];
+    education?: EducationRequirement[];
+    softSkills: string[];
+  };
+  evaluationWeights: {
+    technicalSkills: number;
+    communication: number;
+    problemSolving: number;
+  };
+  status: 'active' | 'inactive';
+}
+
+const VacancyForm: React.FC<VacancyFormProps> = ({ vacancy, onSubmit }) => {
+  const [formData, setFormData] = useState<VacancyFormData>(defaultValues);
+  
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <Card className="p-6">
+        <h3 className="text-lg font-medium mb-4">Basic Information</h3>
+        <div className="grid grid-cols-1 gap-6">
+          <Input
+            label="Job Title"
+            value={formData.title}
+            onChange={(value) => setFormData({...formData, title: value})}
+            required
+          />
+          <Textarea
+            label="Job Description"
+            value={formData.description}
+            onChange={(value) => setFormData({...formData, description: value})}
+            rows={4}
+            required
+          />
+        </div>
+      </Card>
+      
+      <Card className="p-6">
+        <h3 className="text-lg font-medium mb-4">Requirements</h3>
+        <SkillsEditor
+          skills={formData.requirements.technicalSkills}
+          onChange={(skills) => updateRequirements('technicalSkills', skills)}
+        />
+      </Card>
+      
+      <Card className="p-6">
+        <h3 className="text-lg font-medium mb-4">Evaluation Weights</h3>
+        <WeightSliders
+          weights={formData.evaluationWeights}
+          onChange={(weights) => setFormData({...formData, evaluationWeights: weights})}
+        />
+      </Card>
+    </form>
+  );
+};
+```
+
+**Candidate Evaluation Dashboard**
+```typescript
+interface EvaluationReportProps {
+  evaluation: Evaluation;
+  candidate: Candidate;
+  vacancy: Vacancy;
+}
+
+const EvaluationReport: React.FC<EvaluationReportProps> = ({ evaluation, candidate, vacancy }) => {
+  return (
+    <div className="space-y-6">
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Candidate Evaluation</h2>
+          <Badge variant={getRecommendationVariant(evaluation.recommendation)}>
+            {evaluation.recommendation.toUpperCase()}
+          </Badge>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <ScoreCard
+            title="Overall Score"
+            score={evaluation.overallScore}
+            className="bg-blue-50 border-blue-200"
+          />
+          <ScoreCard
+            title="Technical Skills"
+            score={evaluation.technicalScore}
+            className="bg-green-50 border-green-200"
+          />
+          <ScoreCard
+            title="Communication"
+            score={evaluation.communicationScore}
+            className="bg-purple-50 border-purple-200"
+          />
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div>
+            <h3 className="font-medium text-gray-900 mb-2">Strengths</h3>
+            <ul className="space-y-1">
+              {evaluation.strengths.map((strength, index) => (
+                <li key={index} className="flex items-center text-sm text-gray-600">
+                  <CheckIcon className="h-4 w-4 text-green-500 mr-2" />
+                  {strength}
+                </li>
+              ))}
+            </ul>
+          </div>
+          
+          <div>
+            <h3 className="font-medium text-gray-900 mb-2">Areas for Improvement</h3>
+            <ul className="space-y-1">
+              {evaluation.gaps.map((gap, index) => (
+                <li key={index} className="flex items-center text-sm text-gray-600">
+                  <XMarkIcon className="h-4 w-4 text-red-500 mr-2" />
+                  {gap}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </Card>
+      
+      <Card className="p-6">
+        <h3 className="font-medium text-gray-900 mb-4">Conversation History</h3>
+        <ConversationTimeline dialogues={evaluation.dialogues} />
+      </Card>
+    </div>
+  );
+};
+```
+
+**Analytics Dashboard**
+```typescript
+const AnalyticsDashboard: React.FC = () => {
+  const { data: analytics } = useAnalytics();
+  
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatsCard
+          title="Active Vacancies"
+          value={analytics.activeVacancies}
+          change={analytics.vacancyChange}
+          icon={BriefcaseIcon}
+        />
+        <StatsCard
+          title="Total Candidates"
+          value={analytics.totalCandidates}
+          change={analytics.candidateChange}
+          icon={UsersIcon}
+        />
+        <StatsCard
+          title="Interviews Completed"
+          value={analytics.completedInterviews}
+          change={analytics.interviewChange}
+          icon={ChatBubbleLeftRightIcon}
+        />
+        <StatsCard
+          title="Success Rate"
+          value={`${analytics.successRate}%`}
+          change={analytics.successRateChange}
+          icon={TrophyIcon}
+        />
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">Candidate Pipeline</h3>
+          <PipelineChart data={analytics.pipelineData} />
+        </Card>
+        
+        <Card className="p-6">
+          <h3 className="text-lg font-medium mb-4">Evaluation Scores Distribution</h3>
+          <ScoreDistributionChart data={analytics.scoreDistribution} />
+        </Card>
+      </div>
+      
+      <Card className="p-6">
+        <h3 className="text-lg font-medium mb-4">Recent Activity</h3>
+        <ActivityFeed activities={analytics.recentActivities} />
+      </Card>
+    </div>
+  );
+};
+```
+
+#### Tailwind CSS Design System
+
+**Color Palette**
+```css
+/* Custom color scheme for HR system */
+:root {
+  --color-primary-50: #eff6ff;
+  --color-primary-500: #3b82f6;
+  --color-primary-600: #2563eb;
+  --color-success-50: #f0fdf4;
+  --color-success-500: #22c55e;
+  --color-warning-50: #fffbeb;
+  --color-warning-500: #f59e0b;
+  --color-danger-50: #fef2f2;
+  --color-danger-500: #ef4444;
+}
+```
+
+**Component Styling Patterns**
+```typescript
+// Button variants using Tailwind classes
+const buttonVariants = {
+  primary: "bg-blue-600 hover:bg-blue-700 text-white",
+  secondary: "bg-gray-200 hover:bg-gray-300 text-gray-900",
+  success: "bg-green-600 hover:bg-green-700 text-white",
+  danger: "bg-red-600 hover:bg-red-700 text-white",
+};
+
+// Card component with consistent styling
+const Card: React.FC<CardProps> = ({ children, className = "" }) => {
+  return (
+    <div className={`bg-white rounded-lg border border-gray-200 shadow-sm ${className}`}>
+      {children}
+    </div>
+  );
+};
+```
+
 ### Bot Handler Architecture
 
 The bot handlers are redesigned to support the new workflow:
