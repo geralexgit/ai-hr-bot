@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Set up database infrastructure and core models
+- [x] 1. Set up database infrastructure and core models
   - Create PostgreSQL database schema with tables for vacancies, candidates, dialogues, and evaluations
   - Implement database connection utilities with connection pooling and error handling
   - Create TypeScript interfaces and types for all data models
