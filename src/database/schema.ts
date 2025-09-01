@@ -153,6 +153,11 @@ export class DatabaseSchema {
         $$ language 'plpgsql';
       `);
 
+      // Drop trigger if it exists, then create it
+      await db.query(`
+        DROP TRIGGER IF EXISTS update_vacancies_updated_at ON vacancies;
+      `);
+
       await db.query(`
         CREATE TRIGGER update_vacancies_updated_at
         BEFORE UPDATE ON vacancies

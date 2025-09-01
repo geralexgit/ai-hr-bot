@@ -1,31 +1,189 @@
+import { db } from '../database/connection.js';
+import { logger } from '../utils/logger.js';
+
 export interface ConversationMessage {
     role: 'user' | 'ai';
     content: string;
     timestamp: Date;
 }
 
+export interface DialogueRecord {
+    id?: number;
+    candidate_id?: number;
+    vacancy_id?: number;
+    message_type: 'text' | 'audio' | 'system';
+    content: string;
+    audio_file_path?: string;
+    transcription?: string;
+    sender: 'candidate' | 'bot';
+    created_at?: Date;
+}
+
+export interface TelegramUser {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    username?: string;
+}
+
 export class ConversationService {
     private conversations = new Map<number, ConversationMessage[]>();
 
-    getHistory(chatId: number): ConversationMessage[] {
-        return this.conversations.get(chatId) || [];
+    async getHistory(chatId: number): Promise<ConversationMessage[]> {
+        try {
+            // First check in-memory cache
+            if (this.conversations.has(chatId)) {
+                return this.conversations.get(chatId)!;
+            }
+
+            // Load from database
+            const result = await db.query(
+                `SELECT content, sender, created_at
+                 FROM dialogues
+                 WHERE candidate_id = (
+                     SELECT id FROM candidates WHERE telegram_user_id = $1
+                 )
+                 ORDER BY created_at ASC`,
+                [chatId]
+            );
+
+            const messages: ConversationMessage[] = result.rows.map(row => ({
+                role: row.sender === 'candidate' ? 'user' : 'ai',
+                content: row.content,
+                timestamp: new Date(row.created_at)
+            }));
+
+            // Cache in memory
+            this.conversations.set(chatId, messages);
+            return messages;
+        } catch (error) {
+            logger.error('Error loading conversation history from database', { chatId, error });
+            return this.conversations.get(chatId) || [];
+        }
     }
 
-    addMessage(chatId: number, role: 'user' | 'ai', content: string): void {
-        const history = this.getHistory(chatId);
-        history.push({ role, content, timestamp: new Date() });
-        this.conversations.set(chatId, history);
+    async addMessage(chatId: number, role: 'user' | 'ai', content: string, user?: TelegramUser): Promise<void> {
+        try {
+            const message: ConversationMessage = { role, content, timestamp: new Date() };
+
+            // Add to in-memory cache
+            const history = this.conversations.get(chatId) || [];
+            history.push(message);
+            this.conversations.set(chatId, history);
+
+            // Store in database
+            await this.ensureCandidateExists(chatId, user);
+
+            const dialogueRecord: DialogueRecord = {
+                message_type: 'text',
+                content: content,
+                sender: role === 'user' ? 'candidate' : 'bot'
+            };
+
+            await this.saveDialogueToDatabase(chatId, dialogueRecord);
+
+        } catch (error) {
+            logger.error('Error adding message to conversation', { chatId, role, error });
+            // Still keep in memory even if DB fails
+        }
     }
 
-    clearHistory(chatId: number): void {
-        this.conversations.delete(chatId);
+    async clearHistory(chatId: number): Promise<void> {
+        try {
+            // Clear in-memory cache
+            this.conversations.delete(chatId);
+
+            // Clear from database
+            await db.query(
+                `DELETE FROM dialogues
+                 WHERE candidate_id = (
+                     SELECT id FROM candidates WHERE telegram_user_id = $1
+                 )`,
+                [chatId]
+            );
+
+            logger.info('Conversation history cleared', { chatId });
+        } catch (error) {
+            logger.error('Error clearing conversation history', { chatId, error });
+        }
     }
 
-    getContextString(chatId: number, maxMessages: number = 10): string {
-        const history = this.getHistory(chatId);
+    async getContextString(chatId: number, maxMessages: number = 10): Promise<string> {
+        const history = await this.getHistory(chatId);
         return history
             .slice(-maxMessages)
             .map(msg => `${msg.role === 'user' ? 'Candidate' : 'HR Assistant'}: ${msg.content}`)
             .join('\n');
+    }
+
+    private async ensureCandidateExists(telegramUserId: number, user?: TelegramUser): Promise<void> {
+        try {
+            // Check if candidate exists
+            const existing = await db.query(
+                'SELECT id FROM candidates WHERE telegram_user_id = $1',
+                [telegramUserId]
+            );
+
+            if (existing.rows.length === 0) {
+                // Create candidate record with user data
+                await db.query(
+                    'INSERT INTO candidates (telegram_user_id, first_name, last_name, username) VALUES ($1, $2, $3, $4)',
+                    [
+                        telegramUserId,
+                        user?.first_name || null,
+                        user?.last_name || null,
+                        user?.username || null
+                    ]
+                );
+                logger.info('New candidate created', {
+                    telegramUserId,
+                    firstName: user?.first_name,
+                    lastName: user?.last_name,
+                    username: user?.username
+                });
+            } else if (user && (!existing.rows[0].first_name || !existing.rows[0].last_name || !existing.rows[0].username)) {
+                // Update existing candidate if user data is missing
+                await db.query(
+                    'UPDATE candidates SET first_name = $1, last_name = $2, username = $3 WHERE telegram_user_id = $4',
+                    [
+                        user.first_name || null,
+                        user.last_name || null,
+                        user.username || null,
+                        telegramUserId
+                    ]
+                );
+                logger.info('Candidate data updated', {
+                    telegramUserId,
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                    username: user.username
+                });
+            }
+        } catch (error) {
+            logger.error('Error ensuring candidate exists', { telegramUserId, error });
+            throw error;
+        }
+    }
+
+    private async saveDialogueToDatabase(chatId: number, dialogue: DialogueRecord): Promise<void> {
+        try {
+            await db.query(
+                `INSERT INTO dialogues (candidate_id, message_type, content, sender, created_at)
+                 VALUES (
+                     (SELECT id FROM candidates WHERE telegram_user_id = $1),
+                     $2, $3, $4, $5
+                 )`,
+                [
+                    chatId,
+                    dialogue.message_type,
+                    dialogue.content,
+                    dialogue.sender,
+                    dialogue.created_at || new Date()
+                ]
+            );
+        } catch (error) {
+            logger.error('Error saving dialogue to database', { chatId, dialogue, error });
+            throw error;
+        }
     }
 }

@@ -48,10 +48,10 @@ export class BotHandlers {
 /clear - очистить историю разговора`);
     }
 
-    private handleClear(msg: Message): void {
+    private async handleClear(msg: Message): Promise<void> {
         const chatId = msg.chat.id;
 
-        this.conversationService.clearHistory(chatId);
+        await this.conversationService.clearHistory(chatId);
         logger.info('Cleared conversation for chat', { chatId });
 
         this.bot.sendMessage(chatId, 'История разговора очищена.');
@@ -71,7 +71,7 @@ export class BotHandlers {
             if (text.includes('Вакансия:') && text.includes('Резюме:')) {
                 await this.handleResumeAnalysis(chatId, text);
             } else {
-                await this.handleChat(chatId, text);
+                await this.handleChat(chatId, text, msg.from);
             }
         } catch (error) {
             logger.error('Error processing message', { chatId, error });
@@ -193,11 +193,11 @@ export class BotHandlers {
         }
     }
 
-    private async handleChat(chatId: number, message: string): Promise<void> {
+    private async handleChat(chatId: number, message: string, user?: any): Promise<void> {
         logger.info('Processing chat message', { chatId });
 
-        this.conversationService.addMessage(chatId, 'user', message);
-        const conversationContext = this.conversationService.getContextString(chatId);
+        await this.conversationService.addMessage(chatId, 'user', message, user);
+        const conversationContext = await this.conversationService.getContextString(chatId);
 
         const prompt = `
 Ты — HR-ассистент, проводящий интервью с кандидатом.
@@ -232,7 +232,7 @@ ${conversationContext}
                 responseText = rawOutput.replace(/```json|```/g, '').trim() || 'Расскажите подробнее о вашем опыте.';
             }
 
-            this.conversationService.addMessage(chatId, 'ai', rawOutput);
+            await this.conversationService.addMessage(chatId, 'ai', rawOutput);
 
             stopTyping();
             await this.bot.sendMessage(chatId, responseText);

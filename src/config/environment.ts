@@ -15,7 +15,7 @@ export const config = {
     port: parseInt(process.env.DB_PORT || '5432', 10),
     name: process.env.DB_NAME || 'hr_bot',
     username: process.env.DB_USER || 'hr_user',
-    password: process.env.DB_PASSWORD || '',
+    password: process.env.DB_PASSWORD && process.env.DB_PASSWORD.trim() !== '' ? process.env.DB_PASSWORD : null,
     ssl: process.env.DB_SSL === 'true',
     maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '20', 10),
     idleTimeoutMillis: parseInt(process.env.DB_IDLE_TIMEOUT || '30000', 10),
