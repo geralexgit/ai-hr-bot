@@ -14,7 +14,7 @@ export class VacancyRepository extends BaseRepository<Vacancy, CreateVacancyDto,
   async findActive(): Promise<Vacancy[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE status = 'active'`);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find active vacancies`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -29,7 +29,7 @@ export class VacancyRepository extends BaseRepository<Vacancy, CreateVacancyDto,
   async findByStatus(status: 'active' | 'inactive'): Promise<Vacancy[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE status = $1`, [status]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find vacancies by status`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -48,7 +48,7 @@ export class VacancyRepository extends BaseRepository<Vacancy, CreateVacancyDto,
         `SELECT * FROM ${this.tableName} WHERE title ILIKE $1 OR description ILIKE $1`,
         [`%${query}%`]
       );
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to search vacancies`, {
         error: error instanceof Error ? error.message : 'Unknown error',

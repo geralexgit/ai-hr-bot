@@ -31,7 +31,8 @@ export class DatabaseSchema {
           first_name VARCHAR(255),
           last_name VARCHAR(255),
           username VARCHAR(255),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `);
 
@@ -46,7 +47,8 @@ export class DatabaseSchema {
           audio_file_path VARCHAR(500),
           transcription TEXT,
           sender VARCHAR(50) NOT NULL CHECK (sender IN ('candidate', 'bot')),
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `);
 
@@ -67,6 +69,7 @@ export class DatabaseSchema {
           feedback TEXT,
           analysis_data JSONB,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(candidate_id, vacancy_id)
         );
       `);
@@ -142,7 +145,7 @@ export class DatabaseSchema {
     try {
       logger.info('Creating database triggers...');
 
-      // Trigger to update updated_at timestamp on vacancies table
+      // Trigger function to update updated_at timestamp
       await db.query(`
         CREATE OR REPLACE FUNCTION update_updated_at_column()
         RETURNS TRIGGER AS $$
@@ -153,16 +156,20 @@ export class DatabaseSchema {
         $$ language 'plpgsql';
       `);
 
-      // Drop trigger if it exists, then create it
-      await db.query(`
-        DROP TRIGGER IF EXISTS update_vacancies_updated_at ON vacancies;
-      `);
+      // Create triggers for all tables with updated_at
+      const tables = ['vacancies', 'candidates', 'dialogues', 'evaluations'];
 
-      await db.query(`
-        CREATE TRIGGER update_vacancies_updated_at
-        BEFORE UPDATE ON vacancies
-        FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-      `);
+      for (const table of tables) {
+        await db.query(`
+          DROP TRIGGER IF EXISTS update_${table}_updated_at ON ${table};
+        `);
+
+        await db.query(`
+          CREATE TRIGGER update_${table}_updated_at
+          BEFORE UPDATE ON ${table}
+          FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+        `);
+      }
 
       logger.info('Database triggers created successfully');
     } catch (error) {

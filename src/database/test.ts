@@ -58,9 +58,9 @@ async function testDatabaseSchema(): Promise<void> {
   try {
     console.log('🧪 Testing database schema...');
 
-    // Initialize schema
-    await DatabaseInitializer.initialize();
-    console.log('✅ Database schema initialized');
+    // Reset database to ensure clean state
+    await DatabaseInitializer.reset();
+    console.log('✅ Database reset completed');
 
     // Get schema information
     const status = await DatabaseInitializer.getStatus();
@@ -112,7 +112,7 @@ async function testRepositories(): Promise<void> {
     };
 
     const testCandidate: CreateCandidateDto = {
-      telegramUserId: 123456789,
+      telegramUserId: Date.now(), // Use timestamp to ensure uniqueness
       firstName: 'John',
       lastName: 'Doe',
       username: 'johndoe'
