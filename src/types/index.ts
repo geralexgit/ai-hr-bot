@@ -82,6 +82,12 @@ export interface CreateCandidateDto {
   username?: string;
 }
 
+export interface UpdateCandidateDto {
+  firstName?: string | undefined;
+  lastName?: string | undefined;
+  username?: string | undefined;
+}
+
 export interface Dialogue {
   id: number;
   candidateId: number;
@@ -102,6 +108,13 @@ export interface CreateDialogueDto {
   audioFilePath?: string;
   transcription?: string;
   sender: 'candidate' | 'bot';
+}
+
+export interface UpdateDialogueDto {
+  messageType?: 'text' | 'audio' | 'system';
+  content?: string;
+  audioFilePath?: string;
+  transcription?: string;
 }
 
 export interface ExtractedSkill {
@@ -178,6 +191,19 @@ export interface CreateEvaluationDto {
   recommendation: 'proceed' | 'reject' | 'clarify';
   feedback: string;
   analysisData: AnalysisData;
+}
+
+export interface UpdateEvaluationDto {
+  overallScore?: number;
+  technicalScore?: number;
+  communicationScore?: number;
+  problemSolvingScore?: number;
+  strengths?: string[] | undefined;
+  gaps?: string[] | undefined;
+  contradictions?: string[] | undefined;
+  recommendation?: 'proceed' | 'reject' | 'clarify';
+  feedback?: string;
+  analysisData?: AnalysisData;
 }
 
 // Telegram Bot specific types
