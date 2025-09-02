@@ -93,17 +93,16 @@ export class BotHandlers {
         try {
             const cleaned = jsonStr.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/, "");
             const data = JSON.parse(cleaned.trim());
-            const feedback = data.feedback ?? "";
+            const feedback = data.feedback || "";
             const nextQuestion = data.next_question ?? "";
 
-            // Combine feedback and next question with proper formatting
+            // Combine feedback and next question with space
             let response = "";
             if (feedback) {
                 response += feedback;
             }
-            if (nextQuestion && feedback) {
-                response += "\n\n" + nextQuestion;
-            } else if (nextQuestion) {
+            if (nextQuestion) {
+                if (response) response += " ";
                 response += nextQuestion;
             }
 
@@ -225,17 +224,39 @@ ${conversationContext}
         try {
             const rawOutput = await this.ollamaService.generate(prompt);
             let responseText: string;
-
+            
             try {
                 responseText = this.extractFeedbackAndQuestion(rawOutput);
             } catch (error) {
-                responseText = rawOutput.replace(/```json|```/g, '').trim() || 'Расскажите подробнее о вашем опыте.';
+                // Try to parse rawOutput directly as JSON
+                try {
+                    const data = JSON.parse(rawOutput.trim());
+                    const feedback = data.feedback || data.feeedback || "data";
+                    const nextQuestion = data.next_question ?? "";
+                    let response = "";
+                    if (feedback) {
+                        response += feedback;
+                    }
+                    if (nextQuestion) {
+                        if (response) response += " ";
+                        response += nextQuestion;
+                    }
+                    responseText = response || 'Расскажите подробнее о вашем опыте.';
+                } catch (e) {
+                    responseText = rawOutput.replace(/```json|```/g, '').trim() || 'Расскажите подробнее о вашем опыте.';
+                }
             }
 
             await this.conversationService.addMessage(chatId, 'ai', rawOutput);
 
             stopTyping();
-            await this.bot.sendMessage(chatId, responseText);
+            console.log({responseText})
+            const parsedText = JSON.parse(String(responseText))
+            let response = null;
+            if (parsedText?.feedback && parsedText?.next_question) {
+                response = `${parsedText?.feedback} ${parsedText?.next_question}`
+            }
+            await this.bot.sendMessage(chatId, response ?? responseText);
             logger.info('Chat message processed', { chatId });
         } catch (error) {
             stopTyping();

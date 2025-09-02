@@ -31,7 +31,8 @@ export class OllamaService {
         throw new Error(`Ollama API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as OllamaResponse;
+      const data = await response.json() as OllamaResponse
+      
       return data.response;
     } catch (error) {
       logger.error('Error calling Ollama API', error);
