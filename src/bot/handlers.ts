@@ -93,7 +93,7 @@ export class BotHandlers {
         try {
             const cleaned = jsonStr.replace(/^```[a-zA-Z]*\n?/, "").replace(/```$/, "");
             const data = JSON.parse(cleaned.trim());
-            const feedback = data.feedback || "";
+            const feedback = data.feedback || data.feeedback || "";
             const nextQuestion = data.next_question ?? "";
 
             // Combine feedback and next question with space
@@ -251,11 +251,9 @@ ${conversationContext}
 
             stopTyping();
             console.log({responseText})
-            const parsedText = JSON.parse(String(responseText))
-            let response = null;
-            if (parsedText?.feedback && parsedText?.next_question) {
-                response = `${parsedText?.feedback} ${parsedText?.next_question}`
-            }
+            const parsedText = JSON.parse(String(responseText));
+            const feedback = parsedText?.feedback || parsedText?.feeedback || "";
+            let response = `${feedback} ${parsedText?.next_question}`;
             await this.bot.sendMessage(chatId, response ?? responseText);
             logger.info('Chat message processed', { chatId });
         } catch (error) {
