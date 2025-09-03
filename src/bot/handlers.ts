@@ -2,6 +2,7 @@ import TelegramBot, { Message } from 'node-telegram-bot-api';
 import { OllamaService } from '../services/ollama.service.js';
 import { ConversationService } from '../services/conversation.service.js';
 import { logger } from '../utils/logger.js';
+import { convertInputToJSON } from '../utils/convertInputToJSON.js';
 
 export class BotHandlers {
     constructor(
@@ -112,6 +113,24 @@ export class BotHandlers {
         }
     }
 
+    private isValidJSON(str: string): boolean {
+        try {
+            JSON.parse(str);
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    private toFlatString(input: Record<string, string> | string): string {
+        console.log({ input })
+        if (this.isValidJSON(String(input))) {
+            return Object.values(convertInputToJSON(input)).join(" ");
+        }
+        return String(input);
+    }
+
+
     private async handleResumeAnalysis(chatId: number, text: string): Promise<void> {
         logger.info('Processing resume analysis', { chatId });
 
@@ -207,10 +226,12 @@ ${conversationContext}
 Твоя задача:
 1. Проанализируй ответ кандидата
 2. Оцени соответствие требованиям вакансии
-3. Задай следующий уместный вопрос или дай обратную связь
+3. Задай следующий уместный вопрос или дай обратную связь (не повторяйся)
 4. Будь дружелюбным, но профессиональным
+5. На пятом вопросе вежливо попрощайся и дай обратную связь. 
+6. Если пользователь уже прислал больше 6 сообщений, на новые сообщения вежливо отвечай что интервью закончилось.
 
-ВАЖНО: Верни ответ ТОЛЬКО в JSON формате с двумя полями:
+ВАЖНО: Верни ответ строго ТОЛЬКО в JSON формате с двумя полями:
 {
   "feedback": "конструктивная обратная связь для кандидата",
   "next_question": "следующий вопрос для кандидата"
@@ -224,7 +245,7 @@ ${conversationContext}
         try {
             const rawOutput = await this.ollamaService.generate(prompt);
             let responseText: string;
-            
+
             try {
                 responseText = this.extractFeedbackAndQuestion(rawOutput);
             } catch (error) {
@@ -250,11 +271,8 @@ ${conversationContext}
             await this.conversationService.addMessage(chatId, 'ai', rawOutput);
 
             stopTyping();
-            console.log({responseText})
-            const parsedText = JSON.parse(String(responseText));
-            const feedback = parsedText?.feedback || parsedText?.feeedback || "";
-            let response = `${feedback} ${parsedText?.next_question}`;
-            await this.bot.sendMessage(chatId, response ?? responseText);
+            console.log(responseText);
+            await this.bot.sendMessage(chatId, this.toFlatString(responseText));
             logger.info('Chat message processed', { chatId });
         } catch (error) {
             stopTyping();
