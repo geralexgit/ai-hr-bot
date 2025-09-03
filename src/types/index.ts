@@ -248,9 +248,9 @@ export interface LLMResponse {
 
 // Error types
 export class DatabaseError extends Error {
-  public code?: string;
-  public constraint?: string;
-  public table?: string;
+  public code: string | undefined;
+  public constraint: string | undefined;
+  public table: string | undefined;
 
   constructor(message: string, code?: string, constraint?: string, table?: string) {
     super(message);
@@ -276,6 +276,7 @@ export interface ValidationError extends Error {
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
+  message?: string;
   error?: {
     code: string;
     message: string;
