@@ -152,72 +152,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /candidates/:id - Get single candidate with detailed information
-router.get('/:id', async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: 'INVALID_ID',
-          message: 'Invalid candidate ID',
-        },
-      };
-      return res.status(400).json(response);
-    }
-
-    const candidate = await candidateRepository.findById(id);
-    if (!candidate) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: 'CANDIDATE_NOT_FOUND',
-          message: 'Candidate not found',
-        },
-      };
-      return res.status(404).json(response);
-    }
-
-    // Get all evaluations for this candidate
-    const evaluations = await evaluationRepository.findByCandidateId(id);
-
-    // Get dialogue count
-    const dialogueCount = await db.query(
-      'SELECT COUNT(*) as count FROM dialogues WHERE candidate_id = $1',
-      [id]
-    );
-
-    const response: ApiResponse<Candidate & { evaluations: any[], dialogueCount: number }> = {
-      success: true,
-      data: {
-        ...candidate,
-        evaluations,
-        dialogueCount: parseInt(dialogueCount.rows[0].count, 10),
-      },
-    };
-
-    res.json(response);
-    return;
-  } catch (error) {
-    logger.error('Failed to fetch candidate', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      id: req.params.id,
-    });
-
-    const response: ApiResponse<null> = {
-      success: false,
-      error: {
-        code: 'FETCH_CANDIDATE_ERROR',
-        message: 'Failed to fetch candidate',
-      },
-    };
-
-    res.status(500).json(response);
-    return;
-  }
-});
-
 // GET /candidates/:id/evaluations - Get all evaluations for a candidate
 router.get('/:id/evaluations', async (req, res) => {
   try {
@@ -360,6 +294,72 @@ router.get('/:id/dialogues', async (req, res) => {
       error: {
         code: 'FETCH_DIALOGUES_ERROR',
         message: 'Failed to fetch candidate dialogues',
+      },
+    };
+
+    res.status(500).json(response);
+    return;
+  }
+});
+
+// GET /candidates/:id - Get single candidate with detailed information
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid candidate ID',
+        },
+      };
+      return res.status(400).json(response);
+    }
+
+    const candidate = await candidateRepository.findById(id);
+    if (!candidate) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'CANDIDATE_NOT_FOUND',
+          message: 'Candidate not found',
+        },
+      };
+      return res.status(404).json(response);
+    }
+
+    // Get all evaluations for this candidate
+    const evaluations = await evaluationRepository.findByCandidateId(id);
+
+    // Get dialogue count
+    const dialogueCount = await db.query(
+      'SELECT COUNT(*) as count FROM dialogues WHERE candidate_id = $1',
+      [id]
+    );
+
+    const response: ApiResponse<Candidate & { evaluations: any[], dialogueCount: number }> = {
+      success: true,
+      data: {
+        ...candidate,
+        evaluations,
+        dialogueCount: parseInt(dialogueCount.rows[0].count, 10),
+      },
+    };
+
+    res.json(response);
+    return;
+  } catch (error) {
+    logger.error('Failed to fetch candidate', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      id: req.params.id,
+    });
+
+    const response: ApiResponse<null> = {
+      success: false,
+      error: {
+        code: 'FETCH_CANDIDATE_ERROR',
+        message: 'Failed to fetch candidate',
       },
     };
 

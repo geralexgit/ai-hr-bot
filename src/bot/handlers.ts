@@ -123,7 +123,6 @@ export class BotHandlers {
     }
 
     private toFlatString(input: Record<string, string> | string): string {
-        console.log({ input })
         if (this.isValidJSON(String(input))) {
             return Object.values(convertInputToJSON(input)).join(" ");
         }
@@ -271,7 +270,6 @@ ${conversationContext}
             await this.conversationService.addMessage(chatId, 'ai', rawOutput);
 
             stopTyping();
-            console.log(responseText);
             await this.bot.sendMessage(chatId, this.toFlatString(responseText));
             logger.info('Chat message processed', { chatId });
         } catch (error) {

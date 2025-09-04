@@ -1,5 +1,5 @@
-export { BaseRepository } from './BaseRepository.js';
-export { VacancyRepository } from './VacancyRepository.js';
-export { CandidateRepository } from './CandidateRepository.js';
-export { DialogueRepository } from './DialogueRepository.js';
-export { EvaluationRepository } from './EvaluationRepository.js';
+export { BaseRepository } from './BaseRepository';
+export { VacancyRepository } from './VacancyRepository';
+export { CandidateRepository } from './CandidateRepository';
+export { DialogueRepository } from './DialogueRepository';
+export { EvaluationRepository } from './EvaluationRepository';

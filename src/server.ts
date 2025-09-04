@@ -107,3 +107,9 @@ class ApiServer {
 }
 
 export default ApiServer;
+
+// Start the server if this file is run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const server = new ApiServer();
+  server.start();
+}

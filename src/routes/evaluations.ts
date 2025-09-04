@@ -170,7 +170,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /evaluations/statistics - Get evaluation statistics
+// GET /evaluations/statistics/overview - Get evaluation statistics
 router.get('/statistics/overview', async (req, res) => {
   try {
     const stats = await evaluationRepository.getStatistics();
@@ -232,67 +232,6 @@ router.get('/statistics/overview', async (req, res) => {
       error: {
         code: 'FETCH_STATISTICS_ERROR',
         message: 'Failed to fetch evaluation statistics',
-      },
-    };
-
-    res.status(500).json(response);
-    return;
-  }
-});
-
-// GET /evaluations/:id - Get single evaluation with detailed information
-router.get('/:id', async (req, res) => {
-  try {
-    const id = parseInt(req.params.id);
-    if (isNaN(id)) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: 'INVALID_ID',
-          message: 'Invalid evaluation ID',
-        },
-      };
-      return res.status(400).json(response);
-    }
-
-    const evaluation = await evaluationRepository.findById(id);
-    if (!evaluation) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: {
-          code: 'EVALUATION_NOT_FOUND',
-          message: 'Evaluation not found',
-        },
-      };
-      return res.status(404).json(response);
-    }
-
-    // Get candidate and vacancy details
-    const candidate = await candidateRepository.findById(evaluation.candidateId);
-    const vacancy = await vacancyRepository.findById(evaluation.vacancyId);
-
-    const response: ApiResponse<Evaluation & { candidate: any, vacancy: any }> = {
-      success: true,
-      data: {
-        ...evaluation,
-        candidate,
-        vacancy,
-      },
-    };
-
-    res.json(response);
-    return;
-  } catch (error) {
-    logger.error('Failed to fetch evaluation', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-      id: req.params.id,
-    });
-
-    const response: ApiResponse<null> = {
-      success: false,
-      error: {
-        code: 'FETCH_EVALUATION_ERROR',
-        message: 'Failed to fetch evaluation',
       },
     };
 
@@ -411,6 +350,67 @@ router.get('/candidate/:candidateId', async (req, res) => {
       error: {
         code: 'FETCH_CANDIDATE_EVALUATIONS_ERROR',
         message: 'Failed to fetch candidate evaluations',
+      },
+    };
+
+    res.status(500).json(response);
+    return;
+  }
+});
+
+// GET /evaluations/:id - Get single evaluation with detailed information
+router.get('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'INVALID_ID',
+          message: 'Invalid evaluation ID',
+        },
+      };
+      return res.status(400).json(response);
+    }
+
+    const evaluation = await evaluationRepository.findById(id);
+    if (!evaluation) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'EVALUATION_NOT_FOUND',
+          message: 'Evaluation not found',
+        },
+      };
+      return res.status(404).json(response);
+    }
+
+    // Get candidate and vacancy details
+    const candidate = await candidateRepository.findById(evaluation.candidateId);
+    const vacancy = await vacancyRepository.findById(evaluation.vacancyId);
+
+    const response: ApiResponse<Evaluation & { candidate: any, vacancy: any }> = {
+      success: true,
+      data: {
+        ...evaluation,
+        candidate,
+        vacancy,
+      },
+    };
+
+    res.json(response);
+    return;
+  } catch (error) {
+    logger.error('Failed to fetch evaluation', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      id: req.params.id,
+    });
+
+    const response: ApiResponse<null> = {
+      success: false,
+      error: {
+        code: 'FETCH_EVALUATION_ERROR',
+        message: 'Failed to fetch evaluation',
       },
     };
 

@@ -8,14 +8,15 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "tsx watch src/app.ts",
-    "watch": "nodemon --exec tsx src/app.ts",
     "clean": "rm -rf dist",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write src/**/*.ts",
-    "dev:ui": "cd admin-panel && npm run dev",
     "build:ui": "cd admin-panel && npm run build",
     "lint:ui": "cd admin-panel && npm run lint",
-    "format:ui": "cd admin-panel && npm run format"
+    "format:ui": "cd admin-panel && npm run format",
+    "watch:bot": "nodemon --exec tsx src/app.ts",
+    "watch:server": "nodemon --exec tsx src/server.ts",
+    "watch:ui": "cd admin-panel && npm run dev"
   },
   "keywords": [
     "telegram",
@@ -30,10 +31,12 @@
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
-    "@types/express": "^5.0.3",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.23",
     "@types/pg": "^8.15.5",
+    "cors": "^2.8.5",
     "dotenv": "^16.3.1",
-    "express": "^5.1.0",
+    "express": "^4.21.2",
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.66.0",
     "pg": "^8.16.3",

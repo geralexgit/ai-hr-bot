@@ -2,6 +2,7 @@ import { h } from 'preact'
 import { Router, Route } from 'preact-router'
 import { Dashboard } from './pages/Dashboard'
 import { Vacancies } from './pages/Vacancies'
+import { AddVacancy } from './pages/AddVacancy'
 import { Candidates } from './pages/Candidates'
 import { Reports } from './pages/Reports'
 import { Login } from './pages/auth/Login'
@@ -14,6 +15,7 @@ export function App() {
         <Route path="/login" component={Login} />
         <Route path="/" component={() => <Layout><Dashboard /></Layout>} />
         <Route path="/vacancies" component={() => <Layout><Vacancies /></Layout>} />
+        <Route path="/vacancies/new" component={() => <Layout><AddVacancy /></Layout>} />
         <Route path="/candidates" component={() => <Layout><Candidates /></Layout>} />
         <Route path="/reports" component={() => <Layout><Reports /></Layout>} />
       </Router>
