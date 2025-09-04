@@ -31,12 +31,12 @@ export class CandidateRepository extends BaseRepository<Candidate, CreateCandida
     try {
       let candidate = await this.findByTelegramUserId(telegramUserId);
       if (!candidate) {
-        candidate = await this.create({
-          telegramUserId,
-          firstName,
-          lastName,
-          username,
-        });
+        const createData: CreateCandidateDto = { telegramUserId };
+        if (firstName) createData.firstName = firstName;
+        if (lastName) createData.lastName = lastName;
+        if (username) createData.username = username;
+        
+        candidate = await this.create(createData);
       }
       return candidate;
     } catch (error) {

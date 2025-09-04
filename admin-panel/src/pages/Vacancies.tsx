@@ -1,38 +1,59 @@
-import { h } from 'preact'
 import { useState, useEffect } from 'preact/hooks'
-
-interface Vacancy {
-  id: number
-  title: string
-  description: string
-  status: 'active' | 'inactive'
-  createdAt: string
-  updatedAt: string
-}
+import { fetchVacancies, deleteVacancy, Vacancy } from '../services/vacanciesService'
 
 export function Vacancies() {
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set())
 
   useEffect(() => {
-    fetchVacancies()
+    handleFetchVacancies()
   }, [])
 
-  const fetchVacancies = async () => {
-    try {
-      const response = await fetch('/api/vacancies')
-      const result = await response.json()
+  const handleFetchVacancies = async () => {
+    const result = await fetchVacancies()
+    if (result.success && result.data) {
+      // Debug logging to check date format
+      if (result.data.length > 0) {
+        console.log('Sample vacancy data:', result.data[0])
+        console.log('CreatedAt value:', result.data[0].createdAt, 'Type:', typeof result.data[0].createdAt)
+      }
+      setVacancies(result.data)
+    } else {
+      setError(result.error?.message || 'Failed to fetch vacancies')
+    }
+    setLoading(false)
+  }
 
+  const handleDeleteVacancy = async (vacancyId: number, vacancyTitle: string) => {
+    // Confirm deletion
+    if (!confirm(`Are you sure you want to delete the vacancy "${vacancyTitle}"? This action cannot be undone.`)) {
+      return
+    }
+
+    // Add to deleting set
+    setDeletingIds(prev => new Set([...prev, vacancyId]))
+    setError(null)
+
+    try {
+      const result = await deleteVacancy(vacancyId)
+      
       if (result.success) {
-        setVacancies(result.data)
+        // Remove from local state
+        setVacancies(prev => prev.filter(v => v.id !== vacancyId))
       } else {
-        setError(result.error?.message || 'Failed to fetch vacancies')
+        setError(result.error?.message || 'Failed to delete vacancy')
       }
     } catch (err) {
-      setError('Network error occurred')
+      setError('Network error occurred while deleting vacancy')
     } finally {
-      setLoading(false)
+      // Remove from deleting set
+      setDeletingIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(vacancyId)
+        return newSet
+      })
     }
   }
 
@@ -83,17 +104,24 @@ export function Vacancies() {
                       }`}>
                         {vacancy.status}
                       </span>
-                      <span className="text-secondary-500 text-sm ml-4">
-                        Created: {new Date(vacancy.createdAt).toLocaleDateString()}
-                      </span>
+                      {/* <span className="text-secondary-500 text-sm ml-4">
+                        Created: {formatDate(vacancy.createdAt)}
+                      </span> */}
                     </div>
                   </div>
                   <div className="flex space-x-2">
-                    <button className="px-3 py-1 text-sm text-secondary-600 border border-secondary-300 rounded hover:bg-secondary-50">
+                    <button 
+                      onClick={() => window.location.href = `/vacancies/edit/${vacancy.id}`}
+                      className="px-3 py-1 text-sm text-secondary-600 border border-secondary-300 rounded hover:bg-secondary-50"
+                    >
                       Edit
                     </button>
-                    <button className="px-3 py-1 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50">
-                      Delete
+                    <button 
+                      onClick={() => handleDeleteVacancy(vacancy.id, vacancy.title)}
+                      disabled={deletingIds.has(vacancy.id)}
+                      className="px-3 py-1 text-sm text-red-600 border border-red-300 rounded hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {deletingIds.has(vacancy.id) ? 'Deleting...' : 'Delete'}
                     </button>
                   </div>
                 </div>

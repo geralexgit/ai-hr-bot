@@ -1,8 +1,8 @@
-import { useState } from 'preact/hooks'
-import { createVacancy, CreateVacancyDto } from '../services/vacanciesService'
+import { useState, useEffect } from 'preact/hooks'
+import { fetchVacancyById, updateVacancy, UpdateVacancyDto, Vacancy } from '../services/vacanciesService'
 
-export function AddVacancy() {
-  const [formData, setFormData] = useState<CreateVacancyDto>({
+export function EditVacancy() {
+  const [formData, setFormData] = useState<UpdateVacancyDto>({
     title: '',
     description: '',
     requirements: {
@@ -18,20 +18,59 @@ export function AddVacancy() {
     status: 'active'
   })
   const [loading, setLoading] = useState(false)
+  const [loadingVacancy, setLoadingVacancy] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [vacancyId, setVacancyId] = useState<number | null>(null)
+
+  useEffect(() => {
+    // Get vacancy ID from URL (assuming format: /vacancies/edit/:id)
+    const pathParts = window.location.pathname.split('/')
+    const id = pathParts[pathParts.length - 1]
+    if (id && !isNaN(Number(id))) {
+      setVacancyId(Number(id))
+      loadVacancy(Number(id))
+    } else {
+      setError('Invalid vacancy ID')
+      setLoadingVacancy(false)
+    }
+  }, [])
+
+  const loadVacancy = async (id: number) => {
+    try {
+      const result = await fetchVacancyById(id)
+      if (result.success && result.data) {
+        const vacancy = result.data
+        setFormData({
+          title: vacancy.title,
+          description: vacancy.description,
+          requirements: vacancy.requirements,
+          evaluationWeights: vacancy.evaluationWeights,
+          status: vacancy.status
+        })
+      } else {
+        setError(result.error?.message || 'Failed to load vacancy')
+      }
+    } catch (err) {
+      setError('Network error occurred while loading vacancy')
+    } finally {
+      setLoadingVacancy(false)
+    }
+  }
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault()
+    if (!vacancyId) return
+
     setLoading(true)
     setError(null)
 
     try {
-      const result = await createVacancy(formData)
+      const result = await updateVacancy(vacancyId, formData)
 
       if (result.success) {
         window.location.href = '/vacancies'
       } else {
-        setError(result.error?.message || 'Failed to create vacancy')
+        setError(result.error?.message || 'Failed to update vacancy')
       }
     } catch (err) {
       setError('Network error occurred')
@@ -67,11 +106,19 @@ export function AddVacancy() {
     }))
   }
 
+  if (loadingVacancy) {
+    return (
+      <div className="p-6">
+        <p className="text-secondary-600">Loading vacancy...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-secondary-900">Add New Vacancy</h1>
-        <p className="text-secondary-600 mt-2">Create a new job vacancy for the HR bot system.</p>
+        <h1 className="text-3xl font-bold text-secondary-900">Edit Vacancy</h1>
+        <p className="text-secondary-600 mt-2">Update the job vacancy information.</p>
       </div>
 
       <div className="card max-w-4xl">
@@ -86,7 +133,7 @@ export function AddVacancy() {
                 </label>
                 <input
                   type="text"
-                  value={formData.title}
+                  value={formData.title || ''}
                   onInput={(e) => updateFormData('title', (e.target as HTMLInputElement).value)}
                   className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                   required
@@ -97,7 +144,7 @@ export function AddVacancy() {
                   Status
                 </label>
                 <select
-                  value={formData.status}
+                  value={formData.status || 'active'}
                   onChange={(e) => updateFormData('status', (e.target as HTMLSelectElement).value)}
                   className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
@@ -111,7 +158,7 @@ export function AddVacancy() {
                 Description *
               </label>
               <textarea
-                value={formData.description}
+                value={formData.description || ''}
                 onInput={(e) => updateFormData('description', (e.target as HTMLTextAreaElement).value)}
                 rows={4}
                 className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -126,39 +173,39 @@ export function AddVacancy() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Technical Skills ({formData.evaluationWeights.technicalSkills}%)
+                  Technical Skills ({formData.evaluationWeights?.technicalSkills || 50}%)
                 </label>
                 <input
                   type="range"
                   min="0"
                   max="100"
-                  value={formData.evaluationWeights.technicalSkills}
+                  value={formData.evaluationWeights?.technicalSkills || 50}
                   onInput={(e) => updateEvaluationWeights('technicalSkills', parseInt((e.target as HTMLInputElement).value))}
                   className="w-full"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Communication ({formData.evaluationWeights.communication}%)
+                  Communication ({formData.evaluationWeights?.communication || 30}%)
                 </label>
                 <input
                   type="range"
                   min="0"
                   max="100"
-                  value={formData.evaluationWeights.communication}
+                  value={formData.evaluationWeights?.communication || 30}
                   onInput={(e) => updateEvaluationWeights('communication', parseInt((e.target as HTMLInputElement).value))}
                   className="w-full"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Problem Solving ({formData.evaluationWeights.problemSolving}%)
+                  Problem Solving ({formData.evaluationWeights?.problemSolving || 20}%)
                 </label>
                 <input
                   type="range"
                   min="0"
                   max="100"
-                  value={formData.evaluationWeights.problemSolving}
+                  value={formData.evaluationWeights?.problemSolving || 20}
                   onInput={(e) => updateEvaluationWeights('problemSolving', parseInt((e.target as HTMLInputElement).value))}
                   className="w-full"
                 />
@@ -172,7 +219,7 @@ export function AddVacancy() {
             <input
               type="text"
               placeholder="Enter soft skills separated by commas"
-              value={formData.requirements.softSkills.join(', ')}
+              value={formData.requirements?.softSkills?.join(', ') || ''}
               onInput={(e) => updateRequirements('softSkills', (e.target as HTMLInputElement).value.split(',').map(s => s.trim()))}
               className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
@@ -197,7 +244,7 @@ export function AddVacancy() {
               disabled={loading}
               className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
             >
-              {loading ? 'Creating...' : 'Create Vacancy'}
+              {loading ? 'Updating...' : 'Update Vacancy'}
             </button>
           </div>
         </form>

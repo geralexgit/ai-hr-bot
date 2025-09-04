@@ -21,9 +21,9 @@ class ApiServer {
   private setupMiddleware(): void {
     // CORS configuration
     this.app.use(cors({
-      origin: process.env.NODE_ENV === 'production' 
-        ? ['https://your-admin-panel-domain.com'] 
-        : ['http://localhost:5173', 'http://localhost:3000'],
+      origin: config.app.nodeEnv === 'production'
+        ? config.cors.originProd
+        : config.cors.originDev,
       credentials: true,
     }));
 
