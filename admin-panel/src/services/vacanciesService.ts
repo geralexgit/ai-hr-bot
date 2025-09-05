@@ -1,5 +1,6 @@
 // API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
+// Use relative path to leverage Vite's proxy configuration
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 // Types matching the backend structure
 export interface VacancyRequirements {
