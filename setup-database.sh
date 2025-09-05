@@ -18,6 +18,7 @@ DB_USER="hr_user"
 DB_PASSWORD=""
 DB_HOST="localhost"
 DB_PORT="5432"
+SKIP_INIT="false"
 
 # Function to print colored output
 print_info() {
@@ -172,7 +173,77 @@ EOF
     rm -f .env.test
 }
 
-# Function to create .env file
+# Function to initialize database schema and run migrations
+initialize_database() {
+    print_info "Initializing database schema and running migrations..."
+    
+    # Check if npm is available
+    if ! command -v npm &> /dev/null; then
+        print_error "npm not found. Please install Node.js and npm first"
+        exit 1
+    fi
+    
+    # Install dependencies if node_modules doesn't exist
+    if [ ! -d "node_modules" ]; then
+        print_info "Installing dependencies..."
+        npm install
+        print_success "Dependencies installed"
+    fi
+    
+    # Check if project is built
+    if [ ! -d "dist" ]; then
+        print_info "Building project..."
+        npm run build
+        print_success "Project built successfully"
+    fi
+    
+    # Create .env file from template if it doesn't exist (for database connection)
+    if [ ! -f ".env" ]; then
+        print_info "Creating temporary .env for database initialization..."
+        cat > .env << EOF
+DB_HOST=$DB_HOST
+DB_PORT=$DB_PORT
+DB_NAME=$DB_NAME
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASSWORD
+DB_SSL=false
+DB_MAX_CONNECTIONS=20
+DB_IDLE_TIMEOUT=30000
+DB_CONNECTION_TIMEOUT=2000
+TELEGRAM_BOT_TOKEN=temp_token_for_init
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gemma2:latest
+PORT=3000
+NODE_ENV=development
+LOG_LEVEL=info
+EOF
+    fi
+    
+    # Initialize database schema (creates base tables and triggers)
+    print_info "Creating core database tables and triggers..."
+    if node -e "
+        require('dotenv').config();
+        const { DatabaseSchema } = require('./dist/database/schema.js');
+        DatabaseSchema.initialize().then(() => {
+            console.log('✅ Database schema initialized successfully');
+            process.exit(0);
+        }).catch(err => {
+            console.error('❌ Database initialization failed:', err.message);
+            process.exit(1);
+        });
+    "; then
+        print_success "Core database schema initialized"
+    else
+        print_error "Failed to initialize database schema"
+        exit 1
+    fi
+    
+    # The schema initialization includes migration execution, so we just need to check status
+    print_info "Checking final migration status..."
+    npm run db:status
+}
+
+# Function to create or update .env file
 create_env_file() {
     if [ ! -f .env ]; then
         print_info "Creating .env file..."
@@ -193,7 +264,7 @@ DB_CONNECTION_TIMEOUT=2000
 
 # Ollama Configuration
 OLLAMA_BASE_URL=http://localhost:11434
-OLLAMA_MODEL=gemma3n:latest
+OLLAMA_MODEL=gemma2:latest
 
 # Application Configuration
 PORT=3000
@@ -203,13 +274,29 @@ EOF
         print_success ".env file created"
         print_warning "Please edit .env file and set your TELEGRAM_BOT_TOKEN"
     else
-        print_warning ".env file already exists, skipping creation"
+        # Check if .env has the temporary token and update it
+        if grep -q "temp_token_for_init" .env; then
+            print_info "Updating .env file with proper configuration..."
+            sed -i "s/TELEGRAM_BOT_TOKEN=temp_token_for_init/TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here/" .env
+            sed -i "s/OLLAMA_MODEL=gemma2:latest/OLLAMA_MODEL=gemma2:latest/" .env
+            print_success ".env file updated"
+            print_warning "Please edit .env file and set your TELEGRAM_BOT_TOKEN"
+        else
+            print_warning ".env file already exists with custom configuration"
+        fi
     fi
 }
 
 # Function to show next steps
 show_next_steps() {
     print_success "Database setup completed successfully!"
+    echo
+    print_info "Database Features Enabled:"
+    echo "• ✅ Core tables (vacancies, candidates, dialogues, evaluations)"
+    echo "• ✅ JSONB validation functions for technical skills and experience"
+    echo "• ✅ Performance indexes for efficient querying"
+    echo "• ✅ Migration system for schema evolution"
+    echo "• ✅ Automatic triggers for timestamp updates"
     echo
     print_info "Next steps:"
     echo "1. Edit .env file and set your TELEGRAM_BOT_TOKEN"
@@ -218,10 +305,21 @@ show_next_steps() {
     echo "4. Test database connection: npx tsx src/database/test.ts"
     echo "5. Start the application: npm run dev"
     echo
-    print_info "Useful commands:"
-    echo "• Test database: npx tsx src/database/test.ts"
-    echo "• Reset database: npx tsx -e \"import { DatabaseInitializer } from './src/database/init.js'; DatabaseInitializer.reset();\""
-    echo "• View database status: npx tsx -e \"import { DatabaseInitializer } from './src/database/init.js'; DatabaseInitializer.getStatus().then(console.log);\""
+    print_info "Database Management Commands:"
+    echo "• Check migration status: npm run db:status"
+    echo "• Apply pending migrations: npm run db:migrate"
+    echo "• Rollback last migration: npm run db:rollback"
+    echo "• Test database connection: npx tsx src/database/test.ts"
+    echo
+    print_info "Admin Panel Commands:"
+    echo "• Build admin panel: npm run build:ui"
+    echo "• Start admin panel dev: npm run watch:ui"
+    echo "• Start backend dev: npm run watch:server"
+    echo
+    print_info "Validation Functions Available:"
+    echo "• validate_technical_skills(JSONB) - Validates technical skills structure"
+    echo "• validate_experience_requirements(JSONB) - Validates experience requirements"
+    echo "• validate_evaluation_weights(JSONB) - Ensures weights sum to 100%"
 }
 
 # Main function
@@ -254,6 +352,10 @@ main() {
                 DB_PORT="$2"
                 shift 2
                 ;;
+            --skip-init)
+                SKIP_INIT="true"
+                shift
+                ;;
             --help)
                 echo "Usage: $0 [OPTIONS]"
                 echo
@@ -263,11 +365,13 @@ main() {
                 echo "  --db-password PASS   Database password (will prompt if not provided)"
                 echo "  --db-host HOST       Database host (default: localhost)"
                 echo "  --db-port PORT       Database port (default: 5432)"
+                echo "  --skip-init          Skip database schema initialization"
                 echo "  --help               Show this help message"
                 echo
                 echo "Examples:"
                 echo "  $0"
                 echo "  $0 --db-name my_hr_bot --db-user my_user --db-password my_password"
+                echo "  $0 --skip-init  # Only create database and user, skip schema initialization"
                 exit 0
                 ;;
             *)
@@ -285,6 +389,17 @@ main() {
     create_database_and_user
     test_connection
     create_env_file
+    
+    # Conditionally initialize database schema
+    if [ "$SKIP_INIT" = "false" ]; then
+        initialize_database
+    else
+        print_warning "Skipping database schema initialization (--skip-init flag used)"
+        print_info "You can initialize the schema later with:"
+        echo "  npm run build"
+        echo "  npm run db:migrate"
+    fi
+    
     show_next_steps
 }
 

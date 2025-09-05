@@ -1,5 +1,6 @@
 import { db } from './connection.js';
 import { logger } from '../utils/logger.js';
+import { DatabaseMigrator } from './migrate.js';
 
 export class DatabaseSchema {
   /**
@@ -189,6 +190,9 @@ export class DatabaseSchema {
 
       await this.createTables();
       await this.createTriggers();
+      
+      // Run migrations for enhanced features
+      await DatabaseMigrator.migrate();
 
       logger.info('Database schema initialized successfully');
     } catch (error) {

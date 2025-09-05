@@ -16,7 +16,10 @@
     "format:ui": "cd admin-panel && npm run format",
     "watch:bot": "nodemon --exec tsx src/app.ts",
     "watch:server": "nodemon --exec tsx src/server.ts",
-    "watch:ui": "cd admin-panel && npm run dev"
+    "watch:ui": "cd admin-panel && npm run dev",
+    "db:migrate": "tsx src/database/migrate.ts migrate",
+    "db:rollback": "tsx src/database/migrate.ts rollback",
+    "db:status": "tsx src/database/migrate.ts status"
   },
   "keywords": [
     "telegram",
