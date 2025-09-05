@@ -45,7 +45,16 @@ export abstract class BaseRepository<T, CreateDto, UpdateDto> {
    * Convert object keys from snake_case to camelCase
    */
   protected convertKeysToCamelCase(obj: any): any {
-    if (obj === null || obj === undefined || typeof obj !== 'object') {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+
+    // Handle Date objects by converting to ISO string for consistent serialization
+    if (obj instanceof Date) {
+      return obj.toISOString();
+    }
+
+    if (typeof obj !== 'object') {
       return obj;
     }
 
@@ -55,7 +64,12 @@ export abstract class BaseRepository<T, CreateDto, UpdateDto> {
 
     const converted: any = {};
     for (const [key, value] of Object.entries(obj)) {
-      converted[this.snakeToCamel(key)] = this.convertKeysToCamelCase(value);
+      // Convert Date objects to ISO strings for date fields
+      if (value instanceof Date) {
+        converted[this.snakeToCamel(key)] = value.toISOString();
+      } else {
+        converted[this.snakeToCamel(key)] = this.convertKeysToCamelCase(value);
+      }
     }
     return converted;
   }

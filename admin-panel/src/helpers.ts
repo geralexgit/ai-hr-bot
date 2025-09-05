@@ -2,37 +2,42 @@ import { format, parseISO, isValid } from 'date-fns'
 
 
 // Helper function to safely format dates using date-fns
-export const formatDate = (dateString: string): string => {
-    console.log('formatDate: Input date string:', dateString, 'Type:', typeof dateString)
-    if (!dateString) {
-      console.log('formatDate: No date string provided')
+export const formatDate = (dateInput: string | Date | null | undefined): string => {
+    if (!dateInput) {
       return 'Unknown'
     }
     
-    console.log('formatDate: Input date string:', dateString, 'Type:', typeof dateString)
-    
     try {
-      // First try to parse as ISO string (PostgreSQL format)
-      let date = parseISO(dateString)
-      console.log('formatDate: parseISO result:', date, 'isValid:', isValid(date))
+      let date: Date
       
-      // If that fails, try regular Date constructor
-      if (!isValid(date)) {
-        date = new Date(dateString)
-        console.log('formatDate: new Date result:', date, 'isValid:', isValid(date))
+      // Handle different input types
+      if (dateInput instanceof Date) {
+        // Already a Date object
+        date = dateInput
+      } else if (typeof dateInput === 'string') {
+        // Handle string inputs
+        if (dateInput.includes('T') || dateInput.includes('Z')) {
+          // ISO format string
+          date = parseISO(dateInput)
+        } else {
+          // Try regular Date constructor for other formats
+          date = new Date(dateInput)
+        }
+      } else {
+        // Try to convert to Date
+        date = new Date(dateInput as any)
       }
       
-      // Check if date is valid
+      // Validate the date
       if (!isValid(date)) {
-        console.error('formatDate: Invalid date string:', dateString)
+        console.warn('formatDate: Invalid date:', dateInput)
         return 'Invalid Date'
       }
       
-      const formatted = format(date, 'MMM dd, yyyy')
-      console.log('formatDate: Formatted result:', formatted)
-      return formatted
+      // Format the date
+      return format(date, 'MMM dd, yyyy')
     } catch (error) {
-      console.error('formatDate: Error formatting date:', error, 'Date string:', dateString)
+      console.error('formatDate: Error formatting date:', error, 'Input:', dateInput)
       return 'Invalid Date'
     }
   }
