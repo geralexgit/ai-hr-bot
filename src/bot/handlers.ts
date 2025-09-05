@@ -134,8 +134,8 @@ export class BotHandlers {
             userState.lastActivity = new Date();
             this.userStates.set(chatId, userState);
 
-            // Clear previous conversation history
-            await this.conversationService.clearHistory(chatId);
+            // Clear previous conversation history for this vacancy
+            await this.conversationService.clearHistory(chatId, vacancyId);
 
             // Send vacancy info and start interview
             const message = `Отлично! Вы выбрали вакансию: "${vacancy.title}"
@@ -357,8 +357,8 @@ ${vacancy.description}
         userState.lastActivity = new Date();
         this.userStates.set(chatId, userState);
 
-        await this.conversationService.addMessage(chatId, 'user', message, user);
-        const conversationContext = await this.conversationService.getContextString(chatId);
+        await this.conversationService.addMessage(chatId, 'user', message, user, userState.currentVacancyId);
+        const conversationContext = await this.conversationService.getContextString(chatId, 10, userState.currentVacancyId);
 
         // Get vacancy information for context
         let vacancyContext = '';
@@ -431,7 +431,7 @@ ${conversationContext}
                 }
             }
 
-            await this.conversationService.addMessage(chatId, 'ai', rawOutput);
+            await this.conversationService.addMessage(chatId, 'ai', rawOutput, user, userState.currentVacancyId);
 
             // Check if interview is completed
             if (userState.questionCount >= 5) {

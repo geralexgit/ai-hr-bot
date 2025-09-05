@@ -29,23 +29,32 @@ export interface TelegramUser {
 export class ConversationService {
     private conversations = new Map<number, ConversationMessage[]>();
 
-    async getHistory(chatId: number): Promise<ConversationMessage[]> {
+    async getHistory(chatId: number, vacancyId?: number): Promise<ConversationMessage[]> {
         try {
+            // For in-memory cache, we'll use a composite key if vacancy is specified
+            const cacheKey = vacancyId ? `${chatId}_${vacancyId}` : chatId.toString();
+            
             // First check in-memory cache
-            if (this.conversations.has(chatId)) {
+            if (this.conversations.has(chatId) && !vacancyId) {
                 return this.conversations.get(chatId)!;
             }
 
             // Load from database
-            const result = await db.query(
-                `SELECT content, sender, created_at
-                 FROM dialogues
-                 WHERE candidate_id = (
-                     SELECT id FROM candidates WHERE telegram_user_id = $1
-                 )
-                 ORDER BY created_at ASC`,
-                [chatId]
-            );
+            let query = `SELECT content, sender, created_at
+                         FROM dialogues
+                         WHERE candidate_id = (
+                             SELECT id FROM candidates WHERE telegram_user_id = $1
+                         )`;
+            let params: any[] = [chatId];
+
+            if (vacancyId) {
+                query += ` AND vacancy_id = $2`;
+                params.push(vacancyId);
+            }
+
+            query += ` ORDER BY created_at ASC`;
+
+            const result = await db.query(query, params);
 
             const messages: ConversationMessage[] = result.rows.map(row => ({
                 role: row.sender === 'candidate' ? 'user' : 'ai',
@@ -53,16 +62,18 @@ export class ConversationService {
                 timestamp: new Date(row.created_at)
             }));
 
-            // Cache in memory
-            this.conversations.set(chatId, messages);
+            // Cache in memory (only if no vacancy filter to maintain backward compatibility)
+            if (!vacancyId) {
+                this.conversations.set(chatId, messages);
+            }
             return messages;
         } catch (error) {
-            logger.error('Error loading conversation history from database', { chatId, error });
+            logger.error('Error loading conversation history from database', { chatId, vacancyId, error });
             return this.conversations.get(chatId) || [];
         }
     }
 
-    async addMessage(chatId: number, role: 'user' | 'ai', content: string, user?: TelegramUser): Promise<void> {
+    async addMessage(chatId: number, role: 'user' | 'ai', content: string, user?: TelegramUser, vacancyId?: number): Promise<void> {
         try {
             const message: ConversationMessage = { role, content, timestamp: new Date() };
 
@@ -80,6 +91,10 @@ export class ConversationService {
                 sender: role === 'user' ? 'candidate' : 'bot'
             };
 
+            if (vacancyId) {
+                dialogueRecord.vacancy_id = vacancyId;
+            }
+
             await this.saveDialogueToDatabase(chatId, dialogueRecord);
 
         } catch (error) {
@@ -88,28 +103,33 @@ export class ConversationService {
         }
     }
 
-    async clearHistory(chatId: number): Promise<void> {
+    async clearHistory(chatId: number, vacancyId?: number): Promise<void> {
         try {
             // Clear in-memory cache
             this.conversations.delete(chatId);
 
             // Clear from database
-            await db.query(
-                `DELETE FROM dialogues
-                 WHERE candidate_id = (
-                     SELECT id FROM candidates WHERE telegram_user_id = $1
-                 )`,
-                [chatId]
-            );
+            let query = `DELETE FROM dialogues
+                         WHERE candidate_id = (
+                             SELECT id FROM candidates WHERE telegram_user_id = $1
+                         )`;
+            let params: any[] = [chatId];
 
-            logger.info('Conversation history cleared', { chatId });
+            if (vacancyId) {
+                query += ` AND vacancy_id = $2`;
+                params.push(vacancyId);
+            }
+
+            await db.query(query, params);
+
+            logger.info('Conversation history cleared', { chatId, vacancyId });
         } catch (error) {
-            logger.error('Error clearing conversation history', { chatId, error });
+            logger.error('Error clearing conversation history', { chatId, vacancyId, error });
         }
     }
 
-    async getContextString(chatId: number, maxMessages: number = 10): Promise<string> {
-        const history = await this.getHistory(chatId);
+    async getContextString(chatId: number, maxMessages: number = 10, vacancyId?: number): Promise<string> {
+        const history = await this.getHistory(chatId, vacancyId);
         return history
             .slice(-maxMessages)
             .map(msg => `${msg.role === 'user' ? 'Candidate' : 'HR Assistant'}: ${msg.content}`)
@@ -168,13 +188,14 @@ export class ConversationService {
     private async saveDialogueToDatabase(chatId: number, dialogue: DialogueRecord): Promise<void> {
         try {
             await db.query(
-                `INSERT INTO dialogues (candidate_id, message_type, content, sender, created_at)
+                `INSERT INTO dialogues (candidate_id, vacancy_id, message_type, content, sender, created_at)
                  VALUES (
                      (SELECT id FROM candidates WHERE telegram_user_id = $1),
-                     $2, $3, $4, $5
+                     $2, $3, $4, $5, $6
                  )`,
                 [
                     chatId,
+                    dialogue.vacancy_id,
                     dialogue.message_type,
                     dialogue.content,
                     dialogue.sender,
