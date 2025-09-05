@@ -1,0 +1,32 @@
+{
+  "name": "ai-hr-bot-admin-panel",
+  "version": "1.0.0",
+  "description": "Admin panel for AI HR Bot",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "format": "prettier --write ."
+  },
+  "dependencies": {
+    "date-fns": "^4.1.0",
+    "preact": "^10.19.3",
+    "preact-router": "^4.1.2"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.8.2",
+    "@types/react": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.54.0",
+    "eslint-plugin-react": "^7.33.2",
+    "postcss": "^8.4.32",
+    "prettier": "^3.1.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.11"
+  }
+}

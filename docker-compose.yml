@@ -1,0 +1,177 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  database:
+    image: postgres:15-alpine
+    container_name: ai-hr-bot-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-hr_bot}
+      POSTGRES_USER: ${DB_USER:-hr_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-hr_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    networks:
+      - ai-hr-bot-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-hr_user} -d ${DB_NAME:-hr_bot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API Server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-hr-bot-backend
+    restart: unless-stopped
+    environment:
+      # Database Configuration
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hr_bot}
+      DB_USER: ${DB_USER:-hr_user}
+      DB_PASSWORD: ${DB_PASSWORD:-hr_password}
+      DB_SSL: false
+      DB_MAX_CONNECTIONS: 20
+      DB_IDLE_TIMEOUT: 30000
+      DB_CONNECTION_TIMEOUT: 5000
+      
+      # Application Configuration
+      PORT: 3000
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      
+      # CORS Configuration
+      CORS_ORIGIN_DEV: "http://localhost:5173,http://localhost:3001,http://frontend:80"
+      CORS_ORIGIN_PROD: ${CORS_ORIGIN_PROD:-"https://your-admin-panel-domain.com"}
+      
+      # Ollama Configuration
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3n:latest}
+      
+      # Telegram Bot (not used by backend, but needed for shared environment)
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    networks:
+      - ai-hr-bot-network
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - backend_logs:/app/logs
+      - backend_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Telegram Bot Service
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.bot
+    container_name: ai-hr-bot-telegram
+    restart: unless-stopped
+    environment:
+      # Telegram Configuration
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      
+      # Database Configuration
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-hr_bot}
+      DB_USER: ${DB_USER:-hr_user}
+      DB_PASSWORD: ${DB_PASSWORD:-hr_password}
+      DB_SSL: false
+      DB_MAX_CONNECTIONS: 10
+      DB_IDLE_TIMEOUT: 30000
+      DB_CONNECTION_TIMEOUT: 5000
+      
+      # Ollama Configuration
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-gemma3n:latest}
+      
+      # Application Configuration
+      NODE_ENV: ${NODE_ENV:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    networks:
+      - ai-hr-bot-network
+    depends_on:
+      database:
+        condition: service_healthy
+    volumes:
+      - bot_logs:/app/logs
+      - bot_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'node dist/app.js' > /dev/null || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Admin Panel Frontend
+  frontend:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    container_name: ai-hr-bot-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3001}:80"
+    networks:
+      - ai-hr-bot-network
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Ollama service (if you want to run it in Docker)
+  # Uncomment this section if you prefer to run Ollama in Docker
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ai-hr-bot-ollama
+  #   restart: unless-stopped
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - ai-hr-bot-network
+  #   environment:
+  #     - OLLAMA_KEEP_ALIVE=24h
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -f http://localhost:11434/api/tags || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+volumes:
+  postgres_data:
+    driver: local
+  backend_logs:
+    driver: local
+  backend_uploads:
+    driver: local
+  bot_logs:
+    driver: local
+  bot_uploads:
+    driver: local
+  # ollama_data:
+  #   driver: local
+
+networks:
+  ai-hr-bot-network:
+    driver: bridge

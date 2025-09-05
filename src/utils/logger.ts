@@ -23,3 +23,4 @@ export const logger = {
     console.log(`[${timestamp}] [DEBUG] ${message}`, data ? JSON.stringify(data, null, 2) : '');
   }
 };
+

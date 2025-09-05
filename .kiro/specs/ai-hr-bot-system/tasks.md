@@ -69,8 +69,10 @@
   - Write integration tests for API endpoints
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 9. Set up Next.js admin panel project structure
-  - Initialize Next.js 13+ project with TypeScript and Tailwind CSS
+- [ ] 9. Set up Preact.js admin panel project structure
+  - Use root package.json
+  - Add new script npm run watch:ui
+  - Initialize Preact.js project with TypeScript and Tailwind CSS
   - Configure App Router with proper folder structure for auth, dashboard, vacancies, candidates, and reports
   - Set up Tailwind CSS with custom design system and color palette for HR application
   - Create base layout components (Sidebar, Header, Navigation) with responsive design
