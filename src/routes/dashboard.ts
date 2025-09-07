@@ -200,7 +200,7 @@ router.get('/candidates', async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = (page - 1) * limit;
 
-    // Get candidates with their latest vacancy application and evaluation
+    // Get candidates with all their vacancy applications and evaluations
     const candidatesResult = await db.query(`
       SELECT 
         c.id,
@@ -213,37 +213,63 @@ router.get('/candidates', async (req, res) => {
         c.cv_file_size,
         c.cv_uploaded_at,
         c.created_at,
-        v.id as vacancy_id,
-        v.title as vacancy_title,
-        e.id as evaluation_id,
-        e.overall_score,
-        e.recommendation,
-        e.created_at as evaluation_date,
         COUNT(*) OVER() as total_count
       FROM candidates c
-      LEFT JOIN LATERAL (
-        SELECT DISTINCT ON (candidate_id) 
-          candidate_id, vacancy_id
-        FROM dialogues 
-        WHERE candidate_id = c.id
-        ORDER BY candidate_id, created_at DESC
-      ) d ON d.candidate_id = c.id
-      LEFT JOIN vacancies v ON d.vacancy_id = v.id
-      LEFT JOIN LATERAL (
-        SELECT * FROM evaluations 
-        WHERE candidate_id = c.id AND vacancy_id = d.vacancy_id
-        ORDER BY created_at DESC
-        LIMIT 1
-      ) e ON true
       ORDER BY c.created_at DESC
       LIMIT $1 OFFSET $2
     `, [limit, offset]);
+
+    // Get all applications (vacancy dialogues) for these candidates
+    const candidateIds = candidatesResult.rows.map(row => row.id);
+    let applications: any[] = [];
+    
+    if (candidateIds.length > 0) {
+      const applicationsResult = await db.query(`
+        SELECT DISTINCT ON (d.candidate_id, d.vacancy_id)
+          d.candidate_id,
+          d.vacancy_id,
+          v.title as vacancy_title,
+          e.id as evaluation_id,
+          e.overall_score,
+          e.recommendation,
+          e.created_at as evaluation_date,
+          d.created_at as application_date
+        FROM dialogues d
+        LEFT JOIN vacancies v ON d.vacancy_id = v.id
+        LEFT JOIN evaluations e ON d.candidate_id = e.candidate_id AND d.vacancy_id = e.vacancy_id
+        WHERE d.candidate_id = ANY($1)
+        ORDER BY d.candidate_id, d.vacancy_id, d.created_at DESC
+      `, [candidateIds]);
+      
+      applications = applicationsResult.rows;
+    }
 
     const totalCandidates = candidatesResult.rows.length > 0 
       ? parseInt(candidatesResult.rows[0].total_count, 10) 
       : 0;
     
     const totalPages = Math.ceil(totalCandidates / limit);
+
+    // Group applications by candidate
+    const applicationsMap = new Map<number, any[]>();
+    applications.forEach(app => {
+      if (!applicationsMap.has(app.candidate_id)) {
+        applicationsMap.set(app.candidate_id, []);
+      }
+      applicationsMap.get(app.candidate_id)!.push({
+        vacancy: {
+          id: app.vacancy_id,
+          title: app.vacancy_title,
+        },
+        evaluation: app.evaluation_id ? {
+          id: app.evaluation_id,
+          overallScore: app.overall_score,
+          recommendation: app.recommendation,
+          evaluationDate: app.evaluation_date,
+        } : null,
+        applicationDate: app.application_date,
+      });
+    });
 
     const candidates = candidatesResult.rows.map(row => ({
       id: row.id,
@@ -256,16 +282,10 @@ router.get('/candidates', async (req, res) => {
       cvFileSize: row.cv_file_size,
       cvUploadedAt: row.cv_uploaded_at,
       createdAt: row.created_at,
-      vacancy: row.vacancy_id ? {
-        id: row.vacancy_id,
-        title: row.vacancy_title,
-      } : null,
-      evaluation: row.evaluation_id ? {
-        id: row.evaluation_id,
-        overallScore: row.overall_score,
-        recommendation: row.recommendation,
-        evaluationDate: row.evaluation_date,
-      } : null,
+      applications: applicationsMap.get(row.id) || [],
+      // Keep legacy fields for backward compatibility
+      vacancy: applicationsMap.get(row.id)?.[0]?.vacancy || null,
+      evaluation: applicationsMap.get(row.id)?.[0]?.evaluation || null,
     }));
 
     const response: ApiResponse<any> = {

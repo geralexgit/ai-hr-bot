@@ -2,6 +2,20 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 // Types for candidates data
+export interface VacancyApplication {
+  vacancy: {
+    id: number
+    title: string
+  }
+  evaluation?: {
+    id: number
+    overallScore: number
+    recommendation: 'proceed' | 'reject' | 'clarify'
+    evaluationDate: string
+  } | null
+  applicationDate: string
+}
+
 export interface Candidate {
   id: number
   telegramUserId: number
@@ -13,6 +27,8 @@ export interface Candidate {
   cvFileSize?: number
   cvUploadedAt?: string
   createdAt: string
+  applications: VacancyApplication[]
+  // Legacy fields for backward compatibility
   vacancy?: {
     id: number
     title: string

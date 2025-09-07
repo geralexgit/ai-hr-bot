@@ -26,6 +26,8 @@ export function Candidates() {
   
   // Modal state
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null)
+  const [selectedVacancyId, setSelectedVacancyId] = useState<number | undefined>(undefined)
+  const [selectedVacancyTitle, setSelectedVacancyTitle] = useState<string | undefined>(undefined)
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const loadCandidates = async (page: number = 1) => {
@@ -58,13 +60,26 @@ export function Candidates() {
   }
 
   const handleCandidateClick = (candidate: Candidate) => {
+    // For backward compatibility, use the first application if available
     setSelectedCandidate(candidate)
+    setSelectedVacancyId(candidate.applications[0]?.vacancy.id)
+    setSelectedVacancyTitle(candidate.applications[0]?.vacancy.title)
+    setIsModalOpen(true)
+  }
+
+  const handleApplicationClick = (candidate: Candidate, vacancyId: number, vacancyTitle: string, event: Event) => {
+    event.stopPropagation() // Prevent row click
+    setSelectedCandidate(candidate)
+    setSelectedVacancyId(vacancyId)
+    setSelectedVacancyTitle(vacancyTitle)
     setIsModalOpen(true)
   }
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedCandidate(null)
+    setSelectedVacancyId(undefined)
+    setSelectedVacancyTitle(undefined)
   }
 
   const handleCvPreview = (candidate: Candidate, event: Event) => {
@@ -152,13 +167,7 @@ export function Candidates() {
                       {t('candidate')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      {t('vacancy_applied')}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      {t('evaluation')}
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      {t('score')}
+                      {t('applications')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                       CV/Resume
@@ -200,30 +209,45 @@ export function Candidates() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        {candidate.vacancy ? (
-                          <div className="text-sm text-secondary-900">
-                            {candidate.vacancy.title}
+                        {candidate.applications.length > 0 ? (
+                          <div className="space-y-2">
+                            <div className="text-xs text-secondary-500 mb-2">
+                              {candidate.applications.length} application{candidate.applications.length !== 1 ? 's' : ''}
+                            </div>
+                            {candidate.applications.map((application) => (
+                              <div 
+                                key={`${candidate.id}-${application.vacancy.id}`} 
+                                className="flex items-center justify-between p-2 bg-secondary-50 rounded-md hover:bg-secondary-100 cursor-pointer transition-colors"
+                                onClick={(e) => handleApplicationClick(candidate, application.vacancy.id, application.vacancy.title, e)}
+                                title="Click to view dialogue history for this application"
+                              >
+                                <div className="flex-1">
+                                  <div className="text-sm font-medium text-secondary-900">
+                                    {application.vacancy.title}
+                                  </div>
+                                  <div className="text-xs text-secondary-500">
+                                    Applied: {new Date(application.applicationDate).toLocaleDateString()}
+                                  </div>
+                                </div>
+                                <div className="flex items-center space-x-2 ml-4">
+                                  {application.evaluation ? (
+                                    <>
+                                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRecommendationBadgeColor(application.evaluation.recommendation)}`}>
+                                        {application.evaluation.recommendation}
+                                      </span>
+                                      <span className="text-xs text-secondary-600 font-medium">
+                                        {application.evaluation.overallScore}%
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-secondary-500 italic">{t('not_evaluated')}</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         ) : (
                           <span className="text-sm text-secondary-500 italic">{t('no_applications')}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {candidate.evaluation ? (
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRecommendationBadgeColor(candidate.evaluation.recommendation)}`}>
-                            {candidate.evaluation.recommendation}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-secondary-500 italic">{t('not_evaluated')}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {candidate.evaluation ? (
-                          <div className="text-sm text-secondary-900">
-                            {candidate.evaluation.overallScore}%
-                          </div>
-                        ) : (
-                          <span className="text-sm text-secondary-500">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -307,8 +331,8 @@ export function Candidates() {
         <DialogueHistoryModal
           candidateId={selectedCandidate.id}
           candidateName={formatCandidateName(selectedCandidate)}
-          vacancyId={selectedCandidate.vacancy?.id}
-          vacancyTitle={selectedCandidate.vacancy?.title}
+          vacancyId={selectedVacancyId}
+          vacancyTitle={selectedVacancyTitle}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
         />
