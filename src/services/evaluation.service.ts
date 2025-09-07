@@ -1,4 +1,4 @@
-import { OllamaService } from './ollama.service.js';
+import { LLMService } from './llm.service.js';
 import { ConversationService } from './conversation.service.js';
 import { EvaluationRepository } from '../repositories/EvaluationRepository.js';
 import { VacancyRepository } from '../repositories/VacancyRepository.js';
@@ -12,7 +12,7 @@ export interface EvaluationResult {
 }
 
 export class EvaluationService {
-  private ollamaService = new OllamaService();
+  private llmService = new LLMService();
   private conversationService = new ConversationService();
   private evaluationRepository = new EvaluationRepository();
   private vacancyRepository = new VacancyRepository();
@@ -145,7 +145,7 @@ ${conversationText}
 `;
 
     try {
-      const rawOutput = await this.ollamaService.generate(prompt);
+      const rawOutput = await this.llmService.generate(prompt);
       
       // Clean and parse JSON response
       const cleanedOutput = rawOutput.replace(/```json|```/g, '').trim();

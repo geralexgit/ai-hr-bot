@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks'
 import { PromptSetting, fetchPromptSettings, fetchPromptCategories, createPromptSetting, updatePromptSetting, deletePromptSetting, CreatePromptSettingDto, UpdatePromptSettingDto } from '../services/promptSettingsService'
+import { SystemSetting, fetchSettings, testLLMConnection, batchUpdateSettings } from '../services/settingsService'
 
 interface PromptEditModalProps {
   prompt: PromptSetting | null
@@ -195,6 +196,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
 }
 
 export function Settings() {
+  const [activeTab, setActiveTab] = useState<'prompts' | 'llm'>('prompts')
   const [prompts, setPrompts] = useState<PromptSetting[]>([])
   const [categories, setCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -202,6 +204,12 @@ export function Settings() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [editingPrompt, setEditingPrompt] = useState<PromptSetting | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  
+  // LLM Settings state
+  const [llmSettings, setLlmSettings] = useState<SystemSetting[]>([])
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [testingConnection, setTestingConnection] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<{ success: boolean; message: string } | null>(null)
 
   useEffect(() => {
     loadData()
@@ -232,6 +240,29 @@ export function Settings() {
       setLoading(false)
     }
   }
+
+  const loadLlmSettings = async () => {
+    try {
+      setLlmLoading(true)
+      const response = await fetchSettings('llm')
+      
+      if (response.success && response.data) {
+        setLlmSettings(response.data)
+      } else {
+        console.error('Failed to load LLM settings:', response.error?.message)
+      }
+    } catch (err) {
+      console.error('Error loading LLM settings:', err)
+    } finally {
+      setLlmLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'llm') {
+      loadLlmSettings()
+    }
+  }, [activeTab])
 
   const handleSavePrompt = async (data: CreatePromptSettingDto | UpdatePromptSettingDto) => {
     try {
@@ -273,6 +304,66 @@ export function Settings() {
     }
   }
 
+  const handleLlmSettingChange = (key: string, value: string) => {
+    setLlmSettings(prev => prev.map(setting => 
+      setting.key === key ? { ...setting, value } : setting
+    ))
+  }
+
+  const handleSaveLlmSettings = async () => {
+    try {
+      setLlmLoading(true)
+      const updates = llmSettings.map(setting => ({
+        key: setting.key,
+        value: setting.value
+      }))
+
+      const response = await batchUpdateSettings(updates)
+      if (response.success) {
+        setConnectionStatus({ success: true, message: 'LLM settings saved successfully' })
+        setTimeout(() => setConnectionStatus(null), 3000)
+      } else {
+        setConnectionStatus({ success: false, message: response.error?.message || 'Failed to save settings' })
+      }
+    } catch (error) {
+      console.error('Error saving LLM settings:', error)
+      setConnectionStatus({ success: false, message: 'Failed to save settings' })
+    } finally {
+      setLlmLoading(false)
+    }
+  }
+
+  const handleTestConnection = async () => {
+    try {
+      setTestingConnection(true)
+      setConnectionStatus(null)
+      
+      // Save current settings first
+      await handleSaveLlmSettings()
+      
+      // Test connection
+      const response = await testLLMConnection()
+      if (response.success && response.data) {
+        setConnectionStatus({ 
+          success: response.data.connected, 
+          message: response.data.connected ? 
+            `Successfully connected to ${response.data.provider}` : 
+            'Connection failed'
+        })
+      } else {
+        setConnectionStatus({ 
+          success: false, 
+          message: response.error?.message || 'Connection test failed' 
+        })
+      }
+    } catch (error) {
+      console.error('Error testing connection:', error)
+      setConnectionStatus({ success: false, message: 'Connection test failed' })
+    } finally {
+      setTestingConnection(false)
+    }
+  }
+
   const filteredPrompts = selectedCategory === 'all' 
     ? prompts 
     : prompts.filter(p => p.category === selectedCategory)
@@ -310,32 +401,65 @@ export function Settings() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-secondary-900">LLM Prompt Settings</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-        >
-          + New Prompt
-        </button>
+        <h1 className="text-3xl font-bold text-secondary-900">Settings</h1>
+        {activeTab === 'prompts' && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+          >
+            + New Prompt
+          </button>
+        )}
       </div>
 
+      {/* Tab Navigation */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-secondary-700 mb-2">
-          Filter by Category
-        </label>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory((e.target as HTMLSelectElement).value)}
-          className="px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-        >
-          <option value="all">All Categories</option>
-          {categories.map(category => (
-            <option key={category} value={category}>
-              {category.charAt(0).toUpperCase() + category.slice(1)}
-            </option>
-          ))}
-        </select>
+        <div className="border-b border-secondary-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('prompts')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'prompts'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-secondary-500 hover:text-secondary-700 hover:border-secondary-300'
+              }`}
+            >
+              LLM Prompts
+            </button>
+            <button
+              onClick={() => setActiveTab('llm')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'llm'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-secondary-500 hover:text-secondary-700 hover:border-secondary-300'
+              }`}
+            >
+              LLM Configuration
+            </button>
+          </nav>
+        </div>
       </div>
+
+      {/* Prompts Tab Content */}
+      {activeTab === 'prompts' && (
+        <>
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-secondary-700 mb-2">
+              Filter by Category
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory((e.target as HTMLSelectElement).value)}
+              className="px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="all">All Categories</option>
+              {categories.map(category => (
+                <option key={category} value={category}>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </option>
+              ))}
+            </select>
+          </div>
 
       <div className="space-y-4">
         {filteredPrompts.length === 0 ? (
@@ -409,6 +533,144 @@ export function Settings() {
         onSave={handleSavePrompt}
         categories={categories}
       />
+        </>
+      )}
+
+      {/* LLM Configuration Tab Content */}
+      {activeTab === 'llm' && (
+        <div className="space-y-6">
+          {llmLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+              <span className="ml-2 text-secondary-600">Loading LLM settings...</span>
+            </div>
+          ) : (
+            <>
+              {/* Status Message */}
+              {connectionStatus && (
+                <div className={`p-4 rounded-lg ${
+                  connectionStatus.success 
+                    ? 'bg-green-50 border border-green-200 text-green-800' 
+                    : 'bg-red-50 border border-red-200 text-red-800'
+                }`}>
+                  {connectionStatus.message}
+                </div>
+              )}
+
+              {/* LLM Provider Selection */}
+              <div className="card">
+                <h3 className="text-lg font-semibold text-secondary-900 mb-4">LLM Provider</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-secondary-700 mb-2">
+                      Current Provider
+                    </label>
+                    <select
+                      value={llmSettings.find(s => s.key === 'llm_provider')?.value || 'ollama'}
+                      onChange={(e) => handleLlmSettingChange('llm_provider', (e.target as HTMLSelectElement).value)}
+                      className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      disabled={llmLoading}
+                    >
+                      <option value="ollama">Ollama (Local)</option>
+                      <option value="perplexity">Perplexity API</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ollama Settings */}
+              {llmSettings.find(s => s.key === 'llm_provider')?.value === 'ollama' && (
+                <div className="card">
+                  <h3 className="text-lg font-semibold text-secondary-900 mb-4">Ollama Configuration</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700 mb-2">
+                        Base URL
+                      </label>
+                      <input
+                        type="text"
+                        value={llmSettings.find(s => s.key === 'ollama_base_url')?.value || ''}
+                        onChange={(e) => handleLlmSettingChange('ollama_base_url', (e.target as HTMLInputElement).value)}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="http://localhost:11434"
+                        disabled={llmLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700 mb-2">
+                        Model
+                      </label>
+                      <input
+                        type="text"
+                        value={llmSettings.find(s => s.key === 'ollama_model')?.value || ''}
+                        onChange={(e) => handleLlmSettingChange('ollama_model', (e.target as HTMLInputElement).value)}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="gemma3n:latest"
+                        disabled={llmLoading}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Perplexity Settings */}
+              {llmSettings.find(s => s.key === 'llm_provider')?.value === 'perplexity' && (
+                <div className="card">
+                  <h3 className="text-lg font-semibold text-secondary-900 mb-4">Perplexity Configuration</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700 mb-2">
+                        API Key
+                      </label>
+                      <input
+                        type="password"
+                        value={llmSettings.find(s => s.key === 'perplexity_api_key')?.value || ''}
+                        onChange={(e) => handleLlmSettingChange('perplexity_api_key', (e.target as HTMLInputElement).value)}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        placeholder="Enter your Perplexity API key"
+                        disabled={llmLoading}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-secondary-700 mb-2">
+                        Model
+                      </label>
+                      <select
+                        value={llmSettings.find(s => s.key === 'perplexity_model')?.value || 'llama-3.1-sonar-small-128k-online'}
+                        onChange={(e) => handleLlmSettingChange('perplexity_model', (e.target as HTMLSelectElement).value)}
+                        className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        disabled={llmLoading}
+                      >
+                        <option value="llama-3.1-sonar-small-128k-online">Llama 3.1 Sonar Small 128K Online</option>
+                        <option value="llama-3.1-sonar-large-128k-online">Llama 3.1 Sonar Large 128K Online</option>
+                        <option value="llama-3.1-sonar-huge-128k-online">Llama 3.1 Sonar Huge 128K Online</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={handleTestConnection}
+                  disabled={testingConnection || llmLoading}
+                  className="px-4 py-2 text-sm font-medium text-primary-600 bg-white border border-primary-300 rounded-md hover:bg-primary-50 disabled:opacity-50"
+                >
+                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                </button>
+                <button
+                  onClick={handleSaveLlmSettings}
+                  disabled={llmLoading}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 disabled:opacity-50"
+                >
+                  {llmLoading ? 'Saving...' : 'Save Settings'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
