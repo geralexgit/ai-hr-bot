@@ -702,12 +702,12 @@ ${conversationContext}
             // Generate evaluation
             const evaluationResult = await this.evaluationService.generateEvaluation(chatId, vacancyId);
 
-            stopTyping();
-
             // Send evaluation feedback to candidate
             await this.bot.sendMessage(chatId, evaluationResult.feedback, {
                 parse_mode: 'Markdown'
             });
+
+            stopTyping();
 
             // Log successful evaluation
             logger.info('Evaluation completed and sent to candidate', {
@@ -719,9 +719,6 @@ ${conversationContext}
             });
 
         } catch (error) {
-            stopTyping();
-            logger.error('Failed to generate evaluation', { chatId, vacancyId, error });
-            
             // Send fallback message
             await this.bot.sendMessage(chatId, 
                 '🎯 Интервью завершено!\n\n' +
@@ -729,6 +726,9 @@ ${conversationContext}
                 'свяжемся с вами в ближайшее время с результатами.\n\n' +
                 'Хорошего дня! 😊'
             );
+
+            stopTyping();
+            logger.error('Failed to generate evaluation', { chatId, vacancyId, error });
         }
     }
 }
