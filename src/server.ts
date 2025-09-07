@@ -8,6 +8,7 @@ import vacancyRoutes from './routes/vacancies.js';
 import candidateRoutes from './routes/candidates.js';
 import evaluationRoutes from './routes/evaluations.js';
 import dashboardRoutes from './routes/dashboard.js';
+import promptSettingsRoutes from './routes/prompt-settings.js';
 
 class ApiServer {
   private app: express.Application;
@@ -61,6 +62,7 @@ class ApiServer {
     this.app.use('/api/candidates', candidateRoutes);
     this.app.use('/api/evaluations', evaluationRoutes);
     this.app.use('/api/dashboard', dashboardRoutes);
+    this.app.use('/api/prompt-settings', promptSettingsRoutes);
 
     // File serving endpoint for CV files
     this.app.get('/api/files/cv/:candidateId/:filename', (req, res) => {

@@ -6,6 +6,7 @@ import { AddVacancy } from './pages/AddVacancy'
 import { EditVacancy } from './pages/EditVacancy'
 import { Candidates } from './pages/Candidates'
 import { Reports } from './pages/Reports'
+import { Settings } from './pages/Settings'
 import { Login } from './pages/auth/Login'
 import { Layout } from './components/Layout'
 
@@ -20,6 +21,7 @@ export function App() {
         <Route path="/vacancies/edit/:id" component={() => <Layout><EditVacancy /></Layout>} />
         <Route path="/candidates" component={() => <Layout><Candidates /></Layout>} />
         <Route path="/reports" component={() => <Layout><Reports /></Layout>} />
+        <Route path="/settings" component={() => <Layout><Settings /></Layout>} />
       </Router>
     </div>
   )

@@ -3,6 +3,7 @@ import { OllamaService } from '../services/ollama.service.js';
 import { ConversationService } from '../services/conversation.service.js';
 import { FileStorageService } from '../services/file-storage.service.js';
 import { EvaluationService } from '../services/evaluation.service.js';
+import { PromptService } from '../services/prompt.service.js';
 import { VacancyRepository } from '../repositories/VacancyRepository.js';
 import { CandidateRepository } from '../repositories/CandidateRepository.js';
 import { UserState } from '../types/index.js';
@@ -15,6 +16,7 @@ export class BotHandlers {
     private candidateRepository = new CandidateRepository();
     private fileStorageService = new FileStorageService();
     private evaluationService = new EvaluationService();
+    private promptService = new PromptService();
 
     constructor(
         private bot: TelegramBot,
@@ -329,29 +331,11 @@ ${vacancy.description}
                 logger.error('Error loading vacancy context for CV analysis', { vacancyId: userState.currentVacancyId, error });
             }
 
-            const prompt = `
-Ты — HR-ассистент, анализирующий загруженное резюме кандидата.
-
-${vacancyContext}
-
-Файл резюме: ${fileName}
-Содержимое резюме: ${fileContent || '[Содержимое файла не удалось извлечь, но файл был загружен]'}
-
-Твоя задача:
-1. Проанализируй резюме в контексте конкретной вакансии
-2. Извлеки ключевые навыки, опыт работы и образование
-3. Оцени соответствие требованиям вакансии
-4. Определи сильные стороны и пробелы
-5. Задай первый уместный вопрос для углубленного интервью
-
-ВАЖНО: Верни ответ строго ТОЛЬКО в JSON формате с полями:
-{
-  "analysis": "краткий анализ резюме и соответствия вакансии",
-  "strengths": "выявленные сильные стороны кандидата",
-  "gaps": "обнаруженные пробелы или области для уточнения",
-  "first_question": "первый вопрос для интервью на основе анализа резюме"
-}
-`;
+            const prompt = await this.promptService.getRenderedPrompt('cv_analysis', {
+                vacancy_context: vacancyContext,
+                file_name: fileName,
+                file_content: fileContent || '[Содержимое файла не удалось извлечь, но файл был загружен]'
+            });
 
             const rawOutput = await this.ollamaService.generate(prompt);
             let responseText: string;
@@ -506,22 +490,10 @@ ${data.first_question || 'Расскажите подробнее о своем 
             return;
         }
 
-        const prompt = `
-            Ты — HR-ассистент.
-            У тебя есть описание вакансии и резюме кандидата.
-            1. Извлеки ключевые требования из вакансии.
-            2. Извлеки ключевые навыки из резюме.
-            3. Определи совпадения и пробелы.
-            4. Сгенерируй 5 вопросов для интервью (technical, case study, soft skills).
-            5. Ответ кандидата приходит из системы распознавания речи, вероятно, содержит ошибки учитывай это при анализе
-            Верни ответ в JSON с ключами: job_requirements, candidate_skills, matches, gaps, questions.
-            ---
-            Вакансия:
-            ${jobDescription}
-
-            Резюме:
-            ${resume}
-        `;
+        const prompt = await this.promptService.getRenderedPrompt('resume_analysis', {
+            job_description: jobDescription,
+            resume: resume
+        });
 
         const stopTyping = this.startTypingIndicator(chatId);
 
@@ -599,32 +571,12 @@ ${data.first_question || 'Расскажите подробнее о своем 
             logger.error('Error loading vacancy context', { vacancyId: userState.currentVacancyId, error });
         }
 
-        const prompt = `
-Ты — HR-ассистент, проводящий интервью с кандидатом.
-
-${vacancyContext}
-
-Контекст разговора:
-${conversationContext}
-
-Номер вопроса: ${userState.questionCount}
-
-Твоя задача:
-1. Проанализируй ответ кандидата в контексте конкретной вакансии
-2. Оцени соответствие требованиям вакансии
-3. Задай следующий уместный вопрос или дай обратную связь (не повторяйся)
-4. Будь дружелюбным, но профессиональным
-5. На 5-м вопросе вежливо попрощайся и дай финальную обратную связь
-6. Если это уже 6+ вопрос, вежливо отвечай что интервью закончилось
-
-ВАЖНО: Верни ответ строго ТОЛЬКО в JSON формате с двумя полями:
-{
-  "feedback": "конструктивная обратная связь для кандидата",
-  "next_question": "следующий вопрос для кандидата или пустая строка если интервью закончено"
-}
-
-Ответ кандидата: ${message}
-`;
+        const prompt = await this.promptService.getRenderedPrompt('interview_chat', {
+            vacancy_context: vacancyContext,
+            conversation_context: conversationContext,
+            question_count: userState.questionCount,
+            candidate_message: message
+        });
 
         const stopTyping = this.startTypingIndicator(chatId);
 

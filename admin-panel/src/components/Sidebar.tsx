@@ -1,11 +1,11 @@
 import { h } from 'preact'
-import { Link } from 'preact-router/match'
 
 const navigation = [
   { name: 'Dashboard', href: '/', icon: '📊' },
   { name: 'Vacancies', href: '/vacancies', icon: '💼' },
   { name: 'Candidates', href: '/candidates', icon: '👥' },
-  { name: 'Reports', href: '/reports', icon: '📈' },
+  { name: 'Settings', href: '/settings', icon: '⚙️' },
+  // { name: 'Reports', href: '/reports', icon: '📈' },
 ]
 
 export function Sidebar() {
@@ -18,15 +18,14 @@ export function Sidebar() {
         <div className="mt-8 flex-grow flex flex-col">
           <nav className="flex-1 px-2 space-y-1">
             {navigation.map((item) => (
-              <Link
+              <a
                 key={item.name}
                 href={item.href}
                 className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-secondary-600 hover:bg-secondary-50 hover:text-secondary-900"
-                activeClassName="bg-primary-50 text-primary-700"
               >
                 <span className="mr-3">{item.icon}</span>
                 {item.name}
-              </Link>
+              </a>
             ))}
           </nav>
         </div>
