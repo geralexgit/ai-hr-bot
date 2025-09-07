@@ -407,7 +407,8 @@ ${data.first_question || 'Расскажите подробнее о своем 
 
         logger.info('Received message', { chatId, textLength: text.length, vacancyId: userState.currentVacancyId });
 
-        await this.bot.sendChatAction(chatId, 'typing');
+        // Start typing indicator
+        const stopTyping = this.startTypingIndicator(chatId);
 
         try {
             if (text.includes('Вакансия:') && text.includes('Резюме:')) {
@@ -418,6 +419,9 @@ ${data.first_question || 'Расскажите подробнее о своем 
         } catch (error) {
             logger.error('Error processing message', { chatId, error });
             this.bot.sendMessage(chatId, 'Произошла ошибка при обработке сообщения. Попробуйте еще раз.');
+        } finally {
+            // Always stop typing indicator
+            stopTyping();
         }
     }
 
@@ -495,8 +499,6 @@ ${data.first_question || 'Расскажите подробнее о своем 
             resume: resume
         });
 
-        const stopTyping = this.startTypingIndicator(chatId);
-
         try {
             const rawOutput = await this.ollamaService.generate(prompt);
             let jsonOutput;
@@ -529,11 +531,9 @@ ${data.first_question || 'Расскажите подробнее о своем 
                 responseText = jsonOutput.raw;
             }
 
-            stopTyping();
             await this.bot.sendMessage(chatId, responseText);
             logger.info('Resume analysis completed', { chatId });
         } catch (error) {
-            stopTyping();
             logger.error('Error in resume analysis', { chatId, error });
             this.bot.sendMessage(chatId, 'Ошибка при анализе резюме. Попробуйте еще раз.');
         }
@@ -615,6 +615,9 @@ ${data.first_question || 'Расскажите подробнее о своем 
                 userState.stage = 'completed';
                 this.userStates.set(chatId, userState);
 
+                // Stop typing before evaluation as it handles its own typing indicator
+                stopTyping();
+
                 // Trigger evaluation after interview completion
                 try {
                     await this.generateAndSendEvaluation(chatId, userState.currentVacancyId!);
@@ -659,8 +662,6 @@ ${data.first_question || 'Расскажите подробнее о своем 
                 parse_mode: 'Markdown'
             });
 
-            stopTyping();
-
             // Log successful evaluation
             logger.info('Evaluation completed and sent to candidate', {
                 chatId,
@@ -679,8 +680,10 @@ ${data.first_question || 'Расскажите подробнее о своем 
                 'Хорошего дня! 😊'
             );
 
-            stopTyping();
             logger.error('Failed to generate evaluation', { chatId, vacancyId, error });
+        } finally {
+            // Always stop typing indicator
+            stopTyping();
         }
     }
 }
