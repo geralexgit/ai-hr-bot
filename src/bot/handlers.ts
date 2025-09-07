@@ -4,6 +4,7 @@ import { ConversationService } from '../services/conversation.service.js';
 import { FileStorageService } from '../services/file-storage.service.js';
 import { EvaluationService } from '../services/evaluation.service.js';
 import { PromptService } from '../services/prompt.service.js';
+import { i18nService } from '../services/i18n.service.js';
 import { VacancyRepository } from '../repositories/VacancyRepository.js';
 import { CandidateRepository } from '../repositories/CandidateRepository.js';
 import { UserState } from '../types/index.js';
@@ -22,7 +23,12 @@ export class BotHandlers {
         private bot: TelegramBot,
         private ollamaService: OllamaService,
         private conversationService: ConversationService
-    ) { }
+    ) {
+        // Initialize i18n with Russian as default
+        i18nService.initialize('ru').catch(err => {
+            logger.error('Failed to initialize i18n service', { error: err });
+        });
+    }
 
     setupHandlers(): void {
         this.bot.onText(/\/start/, this.handleStart.bind(this));
@@ -56,7 +62,7 @@ export class BotHandlers {
             const activeVacancies = await this.vacancyRepository.findActive();
             
             if (activeVacancies.length === 0) {
-                this.bot.sendMessage(chatId, `Привет, ${userName}! К сожалению, в данный момент нет активных вакансий. Попробуйте позже.`);
+                this.bot.sendMessage(chatId, i18nService.t('no_vacancies'));
                 return;
             }
 
@@ -69,13 +75,13 @@ export class BotHandlers {
             };
 
             this.bot.sendMessage(chatId, 
-                `Привет, ${userName}! Я HR-ассистент. Выберите вакансию, которая вас интересует:`, 
+                i18nService.t('greeting', { name: userName }), 
                 { reply_markup: keyboard }
             );
 
         } catch (error) {
             logger.error('Error loading vacancies', { chatId, error });
-            this.bot.sendMessage(chatId, 'Произошла ошибка при загрузке вакансий. Попробуйте позже.');
+            this.bot.sendMessage(chatId, i18nService.t('error_loading_vacancies'));
         }
     }
 
@@ -124,7 +130,7 @@ export class BotHandlers {
             const vacancy = await this.vacancyRepository.findById(vacancyId);
             
             if (!vacancy) {
-                this.bot.sendMessage(chatId, 'Вакансия не найдена. Попробуйте выбрать другую.');
+                this.bot.sendMessage(chatId, i18nService.t('vacancy_not_found'));
                 return;
             }
 
@@ -145,15 +151,10 @@ export class BotHandlers {
             await this.conversationService.clearHistory(chatId, vacancyId);
 
             // Send vacancy info and start interview
-            const message = `Отлично! Вы выбрали вакансию: "${vacancy.title}"
-
-${vacancy.description}
-
-Теперь давайте проведем интервью. Вы можете:
-1. Загрузить свое резюме (PDF, DOC, DOCX, TXT)
-2. Или просто рассказать о себе и своем опыте работы
-
-Начнем!`;
+            const message = i18nService.t('vacancy_selected', { 
+                title: vacancy.title, 
+                description: vacancy.description 
+            });
 
             this.bot.sendMessage(chatId, message);
             
@@ -165,29 +166,22 @@ ${vacancy.description}
 
         } catch (error) {
             logger.error('Error handling vacancy selection', { chatId, vacancyId, error });
-            this.bot.sendMessage(chatId, 'Произошла ошибка при выборе вакансии. Попробуйте еще раз.');
+            this.bot.sendMessage(chatId, i18nService.t('error_vacancy_selection'));
         }
     }
 
     private handleHelp(msg: Message): void {
         const chatId = msg.chat.id;
 
-        this.bot.sendMessage(chatId, `Я HR-ассистент для проведения интервью и анализа резюме.
+        const helpMessage = `${i18nService.t('help_title')}
 
-Возможности:
-• Загрузка резюме (PDF, DOC, DOCX, TXT файлы)
-• Интерактивное интервью по выбранной вакансии
-• Анализ соответствия требованиям вакансии
+${i18nService.t('help_features')}
 
-Как использовать:
-1. Выберите вакансию командой /start
-2. Загрузите резюме или расскажите о себе
-3. Отвечайте на вопросы интервью
+${i18nService.t('help_usage')}
 
-Команды:
-/start - начать выбор вакансии
-/help - показать эту справку
-/clear - очистить историю разговора`);
+${i18nService.t('help_commands')}`;
+
+        this.bot.sendMessage(chatId, helpMessage);
     }
 
     private async handleClear(msg: Message): Promise<void> {
@@ -196,7 +190,7 @@ ${vacancy.description}
         await this.conversationService.clearHistory(chatId);
         logger.info('Cleared conversation for chat', { chatId });
 
-        this.bot.sendMessage(chatId, 'История разговора очищена.');
+        this.bot.sendMessage(chatId, i18nService.t('history_cleared'));
     }
 
     private async handleDocument(msg: Message): Promise<void> {

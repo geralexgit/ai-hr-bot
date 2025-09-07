@@ -1,4 +1,4 @@
-import { h } from 'preact'
+import { LanguageSelector } from './LanguageSelector'
 
 export function Header() {
   return (
@@ -13,7 +13,7 @@ export function Header() {
         </svg>
       </button>
       <div className="flex-1 px-4 flex justify-between">
-        <div className="flex-1 flex">
+        {/* <div className="flex-1 flex">
           <div className="w-full flex md:ml-0">
             <label htmlFor="search-field" className="sr-only">
               Search
@@ -33,9 +33,10 @@ export function Header() {
               />
             </div>
           </div>
-        </div>
-        <div className="ml-4 flex items-center md:ml-6">
-          <button className="bg-white p-1 rounded-full text-secondary-400 hover:text-secondary-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
+        </div> */}
+        <div className="ml-4 flex items-center md:ml-6 space-x-4">
+          <LanguageSelector />
+          {/* <button className="bg-white p-1 rounded-full text-secondary-400 hover:text-secondary-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500">
             <span className="sr-only">View notifications</span>
             <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-5 5v-5zM4.868 12.683A17.925 17.925 0 012 21.6V19a2 2 0 00-2-2H2a2 2 0 002-2V8.414a1 1 0 00-.293-.707l-1.414-1.414A1 1 0 002.586 6H5a1 1 0 001-1V4a1 1 0 011-1h2a1 1 0 011 1v1a1 1 0 001 1h2.586a1 1 0 00.707.293l1.414 1.414A1 1 0 0014 8.414V10a2 2 0 002 2v2a2 2 0 00-2 2v2.6a17.925 17.925 0 01-1.868-8.917z" />
@@ -51,7 +52,7 @@ export function Header() {
                 </div>
               </button>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

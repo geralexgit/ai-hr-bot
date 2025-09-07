@@ -1,14 +1,15 @@
-import { h } from 'preact'
-
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: '📊' },
-  { name: 'Vacancies', href: '/vacancies', icon: '💼' },
-  { name: 'Candidates', href: '/candidates', icon: '👥' },
-  { name: 'Settings', href: '/settings', icon: '⚙️' },
-  // { name: 'Reports', href: '/reports', icon: '📈' },
-]
+import { useI18n } from '../hooks/useI18n'
 
 export function Sidebar() {
+  const { t } = useI18n()
+  
+  const navigation = [
+    { name: t('dashboard'), href: '/', icon: '📊' },
+    { name: t('vacancies'), href: '/vacancies', icon: '💼' },
+    { name: t('candidates'), href: '/candidates', icon: '👥' },
+    { name: t('settings'), href: '/settings', icon: '⚙️' },
+    // { name: t('reports'), href: '/reports', icon: '📈' },
+  ]
   return (
     <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
       <div className="flex flex-col flex-grow bg-white border-r border-secondary-200 pt-5 pb-4 overflow-y-auto">

@@ -7,8 +7,10 @@ import {
   getCvFileUrl
 } from '../services/candidatesService'
 import { DialogueHistoryModal } from '../components/DialogueHistoryModal'
+import { useI18n } from '../hooks/useI18n'
 
 export function Candidates() {
+  const { t } = useI18n()
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -38,10 +40,10 @@ export function Candidates() {
         setPagination(response.data.pagination)
         setCurrentPage(page)
       } else {
-        setError(response.error?.message || 'Failed to load candidates')
+        setError(response.error?.message || t('failed_to_load_candidates'))
       }
     } catch (err) {
-      setError('Failed to load candidates')
+      setError(t('failed_to_load_candidates'))
     } finally {
       setLoading(false)
     }
@@ -86,11 +88,11 @@ export function Candidates() {
   if (loading) {
     return (
       <div className="p-6">
-        <h1 className="text-3xl font-bold text-secondary-900 mb-6">Candidates</h1>
+        <h1 className="text-3xl font-bold text-secondary-900 mb-6">{t('candidates_title')}</h1>
         <div className="card">
           <div className="flex items-center justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-            <span className="ml-2 text-secondary-600">Loading candidates...</span>
+            <span className="ml-2 text-secondary-600">{t('loading_candidates')}</span>
           </div>
         </div>
       </div>
@@ -100,16 +102,16 @@ export function Candidates() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-3xl font-bold text-secondary-900 mb-6">Candidates</h1>
+        <h1 className="text-3xl font-bold text-secondary-900 mb-6">{t('candidates_title')}</h1>
         <div className="card">
           <div className="text-center py-12">
-            <div className="text-red-600 mb-2">⚠️ Error</div>
+            <div className="text-red-600 mb-2">⚠️ {t('error_occurred')}</div>
             <p className="text-secondary-600">{error}</p>
             <button 
               onClick={() => loadCandidates()}
               className="mt-4 btn-primary"
             >
-              Try Again
+              {t('try_again')}
             </button>
           </div>
         </div>
@@ -121,13 +123,13 @@ export function Candidates() {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-secondary-900">Candidates</h1>
+          <h1 className="text-3xl font-bold text-secondary-900">{t('candidates_title')}</h1>
           <p className="text-sm text-secondary-600 mt-1">
-            Click on any candidate to view their conversation history
+            {t('candidates_subtitle')}
           </p>
         </div>
         <div className="text-sm text-secondary-600">
-          Total: {pagination.total} candidates
+          {t('total_candidates_count', { count: pagination.total })}
         </div>
       </div>
 
@@ -135,8 +137,8 @@ export function Candidates() {
         <div className="card">
           <div className="text-center py-12">
             <div className="text-4xl mb-4">👥</div>
-            <h3 className="text-lg font-medium text-secondary-900 mb-2">No candidates yet</h3>
-            <p className="text-secondary-600">Candidates will appear here once they start applying for vacancies.</p>
+            <h3 className="text-lg font-medium text-secondary-900 mb-2">{t('no_candidates_yet')}</h3>
+            <p className="text-secondary-600">{t('no_candidates_description')}</p>
           </div>
         </div>
       ) : (
@@ -147,22 +149,22 @@ export function Candidates() {
                 <thead className="bg-secondary-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      Candidate
+                      {t('candidate')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      Vacancy Applied
+                      {t('vacancy_applied')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      Evaluation
+                      {t('evaluation')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      Score
+                      {t('score')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                       CV/Resume
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
-                      Registered
+                      {t('registered')}
                     </th>
                   </tr>
                 </thead>
@@ -203,7 +205,7 @@ export function Candidates() {
                             {candidate.vacancy.title}
                           </div>
                         ) : (
-                          <span className="text-sm text-secondary-500 italic">No applications</span>
+                          <span className="text-sm text-secondary-500 italic">{t('no_applications')}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -212,7 +214,7 @@ export function Candidates() {
                             {candidate.evaluation.recommendation}
                           </span>
                         ) : (
-                          <span className="text-sm text-secondary-500 italic">Not evaluated</span>
+                          <span className="text-sm text-secondary-500 italic">{t('not_evaluated')}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -234,10 +236,10 @@ export function Candidates() {
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Preview CV
+                            {t('preview_cv')}
                           </button>
                         ) : (
-                          <span className="text-sm text-secondary-500 italic">No CV uploaded</span>
+                          <span className="text-sm text-secondary-500 italic">{t('no_cv_uploaded')}</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
@@ -254,7 +256,11 @@ export function Candidates() {
           {pagination.totalPages > 1 && (
             <div className="flex items-center justify-between mt-6">
               <div className="text-sm text-secondary-700">
-                Showing {((currentPage - 1) * pagination.limit) + 1} to {Math.min(currentPage * pagination.limit, pagination.total)} of {pagination.total} results
+                {t('showing_results', { 
+                  from: ((currentPage - 1) * pagination.limit) + 1, 
+                  to: Math.min(currentPage * pagination.limit, pagination.total), 
+                  total: pagination.total 
+                })}
               </div>
               <div className="flex space-x-2">
                 <button
@@ -262,7 +268,7 @@ export function Candidates() {
                   disabled={!pagination.hasPrev}
                   className="px-3 py-1 text-sm border border-secondary-300 rounded-md hover:bg-secondary-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Previous
+                  {t('previous')}
                 </button>
                 
                 {/* Page numbers */}
@@ -288,7 +294,7 @@ export function Candidates() {
                   disabled={!pagination.hasNext}
                   className="px-3 py-1 text-sm border border-secondary-300 rounded-md hover:bg-secondary-50 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Next
+                  {t('next')}
                 </button>
               </div>
             </div>

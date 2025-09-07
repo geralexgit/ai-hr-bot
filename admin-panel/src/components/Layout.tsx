@@ -1,4 +1,3 @@
-import { h } from 'preact'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
 

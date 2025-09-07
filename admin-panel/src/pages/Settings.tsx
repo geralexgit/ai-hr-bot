@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks'
+import { useI18n } from '../hooks/useI18n'
 import { PromptSetting, fetchPromptSettings, fetchPromptCategories, createPromptSetting, updatePromptSetting, deletePromptSetting, CreatePromptSettingDto, UpdatePromptSettingDto } from '../services/promptSettingsService'
 import { SystemSetting, fetchSettings, testLLMConnection, batchUpdateSettings } from '../services/settingsService'
 
@@ -11,6 +12,7 @@ interface PromptEditModalProps {
 }
 
 function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: PromptEditModalProps) {
+  const { t } = useI18n()
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -77,7 +79,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-secondary-200">
           <h3 className="text-lg font-semibold text-secondary-900">
-            {prompt ? 'Edit Prompt' : 'Create New Prompt'}
+            {prompt ? t('edit_prompt') : t('create_new_prompt')}
           </h3>
         </div>
 
@@ -85,7 +87,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Name *
+                {t('name')} *
               </label>
               <input
                 type="text"
@@ -99,7 +101,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
 
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Category *
+                {t('category')} *
               </label>
               <div className="space-y-2">
                 <select
@@ -111,7 +113,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
                   {categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
-                  <option value="__new__">+ New Category</option>
+                  <option value="__new__">{t('new_category')}</option>
                 </select>
                 
                 {newCategory !== '' && (
@@ -119,7 +121,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
                     type="text"
                     value={newCategory}
                     onChange={(e) => setNewCategory((e.target as HTMLInputElement).value)}
-                    placeholder="Enter new category name"
+                    placeholder={t('enter_new_category')}
                     className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     disabled={saving}
                   />
@@ -130,7 +132,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
 
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Description
+              {t('description')}
             </label>
             <input
               type="text"
@@ -143,10 +145,10 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
 
           <div>
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Prompt Template *
+              {t('prompt_template')} *
             </label>
             <div className="mb-2 text-sm text-secondary-600">
-              Use placeholders like {`{{variable_name}}`} for dynamic content
+              {t('prompt_template_hint')}
             </div>
             <textarea
               value={formData.promptTemplate}
@@ -168,7 +170,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
               disabled={saving}
             />
             <label htmlFor="isActive" className="ml-2 block text-sm text-secondary-900">
-              Active
+              {t('active')}
             </label>
           </div>
 
@@ -179,14 +181,14 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
               className="px-4 py-2 text-sm font-medium text-secondary-700 bg-white border border-secondary-300 rounded-md hover:bg-secondary-50"
               disabled={saving}
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               type="submit"
               className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 disabled:opacity-50"
               disabled={saving}
             >
-              {saving ? 'Saving...' : (prompt ? 'Update' : 'Create')}
+              {saving ? t('saving') : (prompt ? t('update') : t('create'))}
             </button>
           </div>
         </form>
@@ -196,6 +198,7 @@ function PromptEditModal({ prompt, isOpen, onClose, onSave, categories }: Prompt
 }
 
 export function Settings() {
+  const { t } = useI18n()
   const [activeTab, setActiveTab] = useState<'prompts' | 'llm'>('prompts')
   const [prompts, setPrompts] = useState<PromptSetting[]>([])
   const [categories, setCategories] = useState<string[]>([])
@@ -401,13 +404,13 @@ export function Settings() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-secondary-900">Settings</h1>
+        <h1 className="text-3xl font-bold text-secondary-900">{t('settings_title')}</h1>
         {activeTab === 'prompts' && (
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
           >
-            + New Prompt
+            {t('new_prompt')}
           </button>
         )}
       </div>

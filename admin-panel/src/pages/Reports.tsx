@@ -1,5 +1,3 @@
-import { h } from 'preact'
-
 export function Reports() {
   return (
     <div className="p-6">
