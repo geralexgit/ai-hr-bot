@@ -4,6 +4,7 @@ import { ConversationService } from '../services/conversation.service.js';
 import { FileStorageService } from '../services/file-storage.service.js';
 import { EvaluationService } from '../services/evaluation.service.js';
 import { PromptService } from '../services/prompt.service.js';
+import { InterviewResultsService } from '../services/interview-results.service.js';
 import { i18nService } from '../services/i18n.service.js';
 import { VacancyRepository } from '../repositories/VacancyRepository.js';
 import { CandidateRepository } from '../repositories/CandidateRepository.js';
@@ -18,6 +19,7 @@ export class BotHandlers {
     private fileStorageService = new FileStorageService();
     private evaluationService = new EvaluationService();
     private promptService = new PromptService();
+    private interviewResultsService = new InterviewResultsService();
 
     constructor(
         private bot: TelegramBot,
@@ -150,6 +152,9 @@ export class BotHandlers {
             // Clear previous conversation history for this vacancy
             await this.conversationService.clearHistory(chatId, vacancyId);
 
+            // Start interview result tracking
+            await this.interviewResultsService.startInterview(chatId, vacancyId);
+
             // Send vacancy info and start interview
             const message = i18nService.t('vacancy_selected', { 
                 title: vacancy.title, 
@@ -186,6 +191,21 @@ ${i18nService.t('help_commands')}`;
 
     private async handleClear(msg: Message): Promise<void> {
         const chatId = msg.chat.id;
+
+        // Get current user state
+        const userState = this.userStates.get(chatId);
+        
+        // Cancel interview if in progress
+        if (userState?.currentVacancyId && userState.stage === 'interviewing') {
+            await this.interviewResultsService.cancelInterview(
+                chatId, 
+                userState.currentVacancyId, 
+                'Interview cancelled by user command'
+            );
+        }
+
+        // Clear user state
+        this.userStates.delete(chatId);
 
         await this.conversationService.clearHistory(chatId);
         logger.info('Cleared conversation for chat', { chatId });
@@ -546,6 +566,9 @@ ${data.first_question || 'Расскажите подробнее о своем 
         userState.lastActivity = new Date();
         this.userStates.set(chatId, userState);
 
+        // Update interview progress
+        await this.interviewResultsService.updateProgress(chatId, userState.currentVacancyId, userState.questionCount);
+
         await this.conversationService.addMessage(chatId, 'user', message, user, userState.currentVacancyId);
         const conversationContext = await this.conversationService.getContextString(chatId, 10, userState.currentVacancyId);
 
@@ -648,11 +671,45 @@ ${data.first_question || 'Расскажите подробнее о своем 
         try {
             logger.info('Generating evaluation for completed interview', { chatId, vacancyId });
 
+            // Get user state for session data
+            const userState = this.userStates.get(chatId);
+            const sessionStartTime = userState?.lastActivity || new Date();
+            const sessionEndTime = new Date();
+
             // Generate evaluation
             const evaluationResult = await this.evaluationService.generateEvaluation(chatId, vacancyId);
 
+            // Complete interview and save results to interview_results table
+            await this.interviewResultsService.completeInterview(
+                chatId, 
+                vacancyId, 
+                evaluationResult.evaluation.id,
+                evaluationResult.feedback,
+                {
+                    startTime: sessionStartTime,
+                    endTime: sessionEndTime,
+                    totalQuestions: userState?.questionCount || 0,
+                    totalAnswers: userState?.questionCount || 0,
+                    completionPercentage: 100
+                },
+                {
+                    technicalScore: evaluationResult.evaluation.technicalScore,
+                    softSkillsScore: evaluationResult.evaluation.communicationScore,
+                    overallImpression: `Overall Score: ${evaluationResult.evaluation.overallScore}% - ${evaluationResult.evaluation.recommendation}`,
+                    nextSteps: this.getNextStepsFromRecommendation(evaluationResult.evaluation.recommendation),
+                    followUpRequired: evaluationResult.evaluation.recommendation === 'clarify',
+                    interviewerNotes: `Strengths: ${evaluationResult.evaluation.strengths.join(', ')}. Gaps: ${evaluationResult.evaluation.gaps.join(', ')}`
+                }
+            );
+
             // Send evaluation feedback to candidate
             await this.bot.sendMessage(chatId, evaluationResult.feedback, {
+                parse_mode: 'Markdown'
+            });
+
+            // Send interview results summary
+            const resultsSummary = await this.interviewResultsService.generateResultsSummary(chatId, vacancyId);
+            await this.bot.sendMessage(chatId, resultsSummary, {
                 parse_mode: 'Markdown'
             });
 
@@ -678,6 +735,19 @@ ${data.first_question || 'Расскажите подробнее о своем 
         } finally {
             // Always stop typing indicator
             stopTyping();
+        }
+    }
+
+    private getNextStepsFromRecommendation(recommendation: string): string {
+        switch (recommendation) {
+            case 'proceed':
+                return 'Рекомендуется к прохождению на следующий этап отбора';
+            case 'reject':
+                return 'Не рекомендуется к дальнейшему рассмотрению';
+            case 'clarify':
+                return 'Требуется дополнительное собеседование для уточнения компетенций';
+            default:
+                return 'Результаты будут рассмотрены HR-специалистом';
         }
     }
 }

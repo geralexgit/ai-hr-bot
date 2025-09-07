@@ -227,6 +227,74 @@ export interface UpdateEvaluationDto {
   analysisData?: AnalysisData;
 }
 
+// Interview Results - 🎯 Результаты интервью
+export interface InterviewResult {
+  id: number;
+  dialogueId?: number;
+  candidateId: number;
+  vacancyId: number;
+  evaluationId?: number;
+  interviewStatus: 'completed' | 'in_progress' | 'cancelled';
+  totalQuestions: number;
+  totalAnswers: number;
+  interviewDurationMinutes?: number;
+  completionPercentage: number;
+  finalFeedback?: string;
+  interviewerNotes?: string;
+  candidateSatisfactionRating?: number;
+  technicalAssessmentScore?: number;
+  softSkillsAssessmentScore?: number;
+  overallImpression?: string;
+  nextSteps?: string;
+  followUpRequired: boolean;
+  followUpDate?: Date;
+  resultData?: any;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateInterviewResultDto {
+  dialogueId?: number;
+  candidateId: number;
+  vacancyId: number;
+  evaluationId?: number;
+  interviewStatus: 'completed' | 'in_progress' | 'cancelled';
+  totalQuestions: number;
+  totalAnswers: number;
+  interviewDurationMinutes?: number;
+  completionPercentage: number;
+  finalFeedback?: string;
+  interviewerNotes?: string;
+  candidateSatisfactionRating?: number;
+  technicalAssessmentScore?: number;
+  softSkillsAssessmentScore?: number;
+  overallImpression?: string;
+  nextSteps?: string;
+  followUpRequired?: boolean;
+  followUpDate?: Date;
+  resultData?: any;
+}
+
+export interface UpdateInterviewResultDto {
+  dialogueId?: number;
+  evaluationId?: number;
+  interviewStatus?: 'completed' | 'in_progress' | 'cancelled';
+  totalQuestions?: number;
+  totalAnswers?: number;
+  interviewDurationMinutes?: number;
+  completionPercentage?: number;
+  finalFeedback?: string;
+  interviewerNotes?: string;
+  candidateSatisfactionRating?: number;
+  technicalAssessmentScore?: number;
+  softSkillsAssessmentScore?: number;
+  overallImpression?: string;
+  nextSteps?: string;
+  followUpRequired?: boolean;
+  followUpDate?: Date;
+  resultData?: any;
+}
+
 // Telegram Bot specific types
 export interface TelegramUser {
   id: number;
