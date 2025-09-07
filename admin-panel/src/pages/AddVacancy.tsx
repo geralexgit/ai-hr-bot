@@ -1,7 +1,9 @@
 import { useState } from 'preact/hooks'
 import { createVacancy, CreateVacancyDto } from '../services/vacanciesService'
+import { useI18n } from '../hooks/useI18n'
 
 export function AddVacancy() {
+  const { t } = useI18n()
   const [formData, setFormData] = useState<CreateVacancyDto>({
     title: '',
     description: '',
@@ -31,10 +33,10 @@ export function AddVacancy() {
       if (result.success) {
         window.location.href = '/vacancies'
       } else {
-        setError(result.error?.message || 'Failed to create vacancy')
+        setError(result.error?.message || t('failed_to_create_vacancy'))
       }
     } catch (err) {
-      setError('Network error occurred')
+      setError(t('network_error_occurred'))
     } finally {
       setLoading(false)
     }
@@ -70,19 +72,19 @@ export function AddVacancy() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-secondary-900">Add New Vacancy</h1>
-        <p className="text-secondary-600 mt-2">Create a new job vacancy for the HR bot system.</p>
+        <h1 className="text-3xl font-bold text-secondary-900">{t('add_new_vacancy_title')}</h1>
+        <p className="text-secondary-600 mt-2">{t('add_new_vacancy_subtitle')}</p>
       </div>
 
       <div className="card max-w-4xl">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Information */}
           <div>
-            <h2 className="text-xl font-semibold text-secondary-900 mb-4">Basic Information</h2>
+            <h2 className="text-xl font-semibold text-secondary-900 mb-4">{t('basic_information')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Title *
+                  {t('title_required')}
                 </label>
                 <input
                   type="text"
@@ -94,21 +96,21 @@ export function AddVacancy() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Status
+                  {t('status')}
                 </label>
                 <select
                   value={formData.status}
                   onChange={(e) => updateFormData('status', (e.target as HTMLSelectElement).value)}
                   className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
+                  <option value="active">{t('form_active')}</option>
+                  <option value="inactive">{t('form_inactive')}</option>
                 </select>
               </div>
             </div>
             <div className="mt-4">
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Description *
+                {t('description_required')}
               </label>
               <textarea
                 value={formData.description}
@@ -122,11 +124,11 @@ export function AddVacancy() {
 
           {/* Evaluation Weights */}
           <div>
-            <h2 className="text-xl font-semibold text-secondary-900 mb-4">Evaluation Weights</h2>
+            <h2 className="text-xl font-semibold text-secondary-900 mb-4">{t('evaluation_weights_title')}</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Technical Skills ({formData.evaluationWeights.technicalSkills}%)
+                  {t('technical_skills_weight')} ({formData.evaluationWeights.technicalSkills}%)
                 </label>
                 <input
                   type="range"
@@ -139,7 +141,7 @@ export function AddVacancy() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Communication ({formData.evaluationWeights.communication}%)
+                  {t('communication_weight')} ({formData.evaluationWeights.communication}%)
                 </label>
                 <input
                   type="range"
@@ -152,7 +154,7 @@ export function AddVacancy() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Problem Solving ({formData.evaluationWeights.problemSolving}%)
+                  {t('problem_solving_weight')} ({formData.evaluationWeights.problemSolving}%)
                 </label>
                 <input
                   type="range"
@@ -168,10 +170,10 @@ export function AddVacancy() {
 
           {/* Soft Skills */}
           <div>
-            <h2 className="text-xl font-semibold text-secondary-900 mb-4">Soft Skills</h2>
+            <h2 className="text-xl font-semibold text-secondary-900 mb-4">{t('soft_skills_title')}</h2>
             <input
               type="text"
-              placeholder="Enter soft skills separated by commas"
+              placeholder={t('soft_skills_placeholder')}
               value={formData.requirements.softSkills.join(', ')}
               onInput={(e) => updateRequirements('softSkills', (e.target as HTMLInputElement).value.split(',').map(s => s.trim()))}
               className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -190,14 +192,14 @@ export function AddVacancy() {
               onClick={() => window.location.href = '/vacancies'}
               className="px-4 py-2 text-secondary-600 border border-secondary-300 rounded-md hover:bg-secondary-50"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
               className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
             >
-              {loading ? 'Creating...' : 'Create Vacancy'}
+              {loading ? t('creating') : t('create_vacancy')}
             </button>
           </div>
         </form>

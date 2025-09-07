@@ -158,13 +158,13 @@ export function Vacancies() {
                               <div className={`w-2 h-2 rounded-full mr-2 ${
                                 vacancy.status === 'active' ? 'bg-green-500' : 'bg-gray-500'
                               }`}></div>
-                              {vacancy.status === 'active' ? t('active') : t('inactive')}
+                              {vacancy.status === 'active' ? t('status_active') : t('status_inactive')}
                             </span>
                             <span className="text-gray-500 text-sm flex items-center">
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h8m-8 0H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V9a2 2 0 00-2-2h-2"/>
                               </svg>
-                              {t('created')} {vacancy.createdAt ? formatDate(vacancy.createdAt) : 'Unknown'}
+                              {t('created_at')} {vacancy.createdAt ? formatDate(vacancy.createdAt) : 'Unknown'}
                             </span>
                           </div>
                         </div>

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks'
 import { useI18n } from '../hooks/useI18n'
 import { PromptSetting, fetchPromptSettings, fetchPromptCategories, createPromptSetting, updatePromptSetting, deletePromptSetting, CreatePromptSettingDto, UpdatePromptSettingDto } from '../services/promptSettingsService'
 import { SystemSetting, fetchSettings, testLLMConnection, batchUpdateSettings } from '../services/settingsService'
+import { getTranslatedPromptName, getTranslatedPromptDescription, hasPromptTranslation } from '../utils/promptTranslations'
 
 interface PromptEditModalProps {
   prompt: PromptSetting | null
@@ -231,14 +232,14 @@ export function Settings() {
       if (promptsResponse.success && promptsResponse.data) {
         setPrompts(promptsResponse.data)
       } else {
-        setError(promptsResponse.error?.message || 'Failed to load prompts')
+        setError(promptsResponse.error?.message || t('failed_to_load', { item: 'prompts' }))
       }
 
       if (categoriesResponse.success && categoriesResponse.data) {
         setCategories(categoriesResponse.data)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred')
+      setError(err instanceof Error ? err.message : t('unexpected_error'))
     } finally {
       setLoading(false)
     }
@@ -290,7 +291,7 @@ export function Settings() {
   }
 
   const handleDeletePrompt = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this prompt?')) {
+    if (!confirm(t('settings_confirm_delete_prompt'))) {
       return
     }
 
@@ -299,11 +300,11 @@ export function Settings() {
       if (response.success) {
         await loadData()
       } else {
-        alert(response.error?.message || 'Failed to delete prompt')
+        alert(response.error?.message || t('settings_failed_to_delete_prompt'))
       }
     } catch (error) {
       console.error('Error deleting prompt:', error)
-      alert('Failed to delete prompt')
+      alert(t('settings_failed_to_delete_prompt'))
     }
   }
 
@@ -323,14 +324,14 @@ export function Settings() {
 
       const response = await batchUpdateSettings(updates)
       if (response.success) {
-        setConnectionStatus({ success: true, message: 'LLM settings saved successfully' })
+        setConnectionStatus({ success: true, message: t('llm_settings_saved') })
         setTimeout(() => setConnectionStatus(null), 3000)
       } else {
-        setConnectionStatus({ success: false, message: response.error?.message || 'Failed to save settings' })
+        setConnectionStatus({ success: false, message: response.error?.message || t('failed_to_save_settings') })
       }
     } catch (error) {
       console.error('Error saving LLM settings:', error)
-      setConnectionStatus({ success: false, message: 'Failed to save settings' })
+      setConnectionStatus({ success: false, message: t('failed_to_save_settings') })
     } finally {
       setLlmLoading(false)
     }
@@ -350,18 +351,18 @@ export function Settings() {
         setConnectionStatus({ 
           success: response.data.connected, 
           message: response.data.connected ? 
-            `Successfully connected to ${response.data.provider}` : 
-            'Connection failed'
+            t('successfully_connected', { provider: response.data.provider }) : 
+            t('connection_failed')
         })
       } else {
         setConnectionStatus({ 
           success: false, 
-          message: response.error?.message || 'Connection test failed' 
+          message: response.error?.message || t('connection_test_failed') 
         })
       }
     } catch (error) {
       console.error('Error testing connection:', error)
-      setConnectionStatus({ success: false, message: 'Connection test failed' })
+      setConnectionStatus({ success: false, message: t('connection_test_failed') })
     } finally {
       setTestingConnection(false)
     }
@@ -374,10 +375,10 @@ export function Settings() {
   if (loading) {
     return (
       <div className="p-6">
-        <h1 className="text-3xl font-bold text-secondary-900 mb-6">LLM Prompt Settings</h1>
+        <h1 className="text-3xl font-bold text-secondary-900 mb-6">{t('llm_prompt_settings')}</h1>
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-          <span className="ml-2 text-secondary-600">Loading prompts...</span>
+          <span className="ml-2 text-secondary-600">{t('settings_loading_prompts')}</span>
         </div>
       </div>
     )
@@ -386,15 +387,15 @@ export function Settings() {
   if (error) {
     return (
       <div className="p-6">
-        <h1 className="text-3xl font-bold text-secondary-900 mb-6">LLM Prompt Settings</h1>
+        <h1 className="text-3xl font-bold text-secondary-900 mb-6">{t('llm_prompt_settings')}</h1>
         <div className="bg-error-50 border border-error-200 rounded-lg p-4">
-          <h3 className="text-error-800 font-semibold mb-2">Error Loading Prompts</h3>
+          <h3 className="text-error-800 font-semibold mb-2">{t('settings_error_loading_prompts')}</h3>
           <p className="text-error-600">{error}</p>
           <button
             onClick={loadData}
             className="mt-3 px-4 py-2 bg-error-600 text-white rounded hover:bg-error-700 transition-colors"
           >
-            Retry
+            {t('retry')}
           </button>
         </div>
       </div>
@@ -427,7 +428,7 @@ export function Settings() {
                   : 'border-transparent text-secondary-500 hover:text-secondary-700 hover:border-secondary-300'
               }`}
             >
-              LLM Prompts
+              {t('llm_prompts')}
             </button>
             <button
               onClick={() => setActiveTab('llm')}
@@ -437,7 +438,7 @@ export function Settings() {
                   : 'border-transparent text-secondary-500 hover:text-secondary-700 hover:border-secondary-300'
               }`}
             >
-              LLM Configuration
+              {t('llm_configuration')}
             </button>
           </nav>
         </div>
@@ -448,14 +449,14 @@ export function Settings() {
         <>
           <div className="mb-6">
             <label className="block text-sm font-medium text-secondary-700 mb-2">
-              Filter by Category
+              {t('filter_by_category')}
             </label>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory((e.target as HTMLSelectElement).value)}
               className="px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="all">All Categories</option>
+              <option value="all">{t('all_categories')}</option>
               {categories.map(category => (
                 <option key={category} value={category}>
                   {category.charAt(0).toUpperCase() + category.slice(1)}
@@ -467,26 +468,36 @@ export function Settings() {
       <div className="space-y-4">
         {filteredPrompts.length === 0 ? (
           <div className="text-center py-12 text-secondary-500">
-            {selectedCategory === 'all' ? 'No prompts found' : `No prompts found in ${selectedCategory} category`}
+            {selectedCategory === 'all' ? t('no_prompts_found') : t('no_prompts_in_category', { category: selectedCategory })}
           </div>
         ) : (
-          filteredPrompts.map((prompt) => (
+          filteredPrompts.map((prompt) => {
+            const hasTranslation = hasPromptTranslation(prompt.name, t)
+            const displayName = hasTranslation ? getTranslatedPromptName(prompt.name, t) : prompt.name
+            const displayDescription = hasTranslation ? getTranslatedPromptDescription(prompt.name, t) : prompt.description
+            
+            return (
             <div key={prompt.id} className="card">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-secondary-900">{prompt.name}</h3>
+                    <h3 className="text-lg font-semibold text-secondary-900">{displayName}</h3>
+                    {hasTranslation && (
+                      <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded-full">
+                        {t('translated')}
+                      </span>
+                    )}
                     <span className="px-2 py-1 text-xs font-medium bg-primary-100 text-primary-800 rounded-full">
                       {prompt.category}
                     </span>
                     {!prompt.isActive && (
                       <span className="px-2 py-1 text-xs font-medium bg-error-100 text-error-800 rounded-full">
-                        Inactive
+                        {t('settings_inactive')}
                       </span>
                     )}
                   </div>
-                  {prompt.description && (
-                    <p className="text-secondary-600 mb-3">{prompt.description}</p>
+                  {displayDescription && (
+                    <p className="text-secondary-600 mb-3">{displayDescription}</p>
                   )}
                 </div>
                 <div className="flex gap-2 ml-4">
@@ -494,30 +505,33 @@ export function Settings() {
                     onClick={() => setEditingPrompt(prompt)}
                     className="px-3 py-1 text-sm text-primary-600 hover:text-primary-800 hover:bg-primary-50 rounded"
                   >
-                    Edit
+                    {t('edit')}
                   </button>
                   <button
                     onClick={() => handleDeletePrompt(prompt.id)}
                     className="px-3 py-1 text-sm text-error-600 hover:text-error-800 hover:bg-error-50 rounded"
                   >
-                    Delete
+                    {t('delete')}
                   </button>
                 </div>
               </div>
               
               <div className="bg-secondary-50 rounded-md p-4">
-                <h4 className="text-sm font-medium text-secondary-700 mb-2">Prompt Template:</h4>
+                <h4 className="text-sm font-medium text-secondary-700 mb-2">{t('prompt_template_label')}</h4>
                 <pre className="text-sm text-secondary-900 whitespace-pre-wrap font-mono bg-white p-3 rounded border max-h-40 overflow-y-auto">
                   {prompt.promptTemplate}
                 </pre>
               </div>
               
               <div className="mt-3 text-xs text-secondary-500">
-                Created: {new Date(prompt.createdAt).toLocaleString()} | 
-                Updated: {new Date(prompt.updatedAt).toLocaleString()}
+                {t('created_updated', { 
+                  created: new Date(prompt.createdAt).toLocaleString(), 
+                  updated: new Date(prompt.updatedAt).toLocaleString() 
+                })}
               </div>
             </div>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -545,7 +559,7 @@ export function Settings() {
           {llmLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
-              <span className="ml-2 text-secondary-600">Loading LLM settings...</span>
+              <span className="ml-2 text-secondary-600">{t('settings_loading_llm_settings')}</span>
             </div>
           ) : (
             <>
@@ -562,11 +576,11 @@ export function Settings() {
 
               {/* LLM Provider Selection */}
               <div className="card">
-                <h3 className="text-lg font-semibold text-secondary-900 mb-4">LLM Provider</h3>
+                <h3 className="text-lg font-semibold text-secondary-900 mb-4">{t('llm_provider')}</h3>
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-secondary-700 mb-2">
-                      Current Provider
+                      {t('current_provider')}
                     </label>
                     <select
                       value={llmSettings.find(s => s.key === 'llm_provider')?.value || 'ollama'}
@@ -574,8 +588,8 @@ export function Settings() {
                       className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                       disabled={llmLoading}
                     >
-                      <option value="ollama">Ollama (Local)</option>
-                      <option value="perplexity">Perplexity API</option>
+                      <option value="ollama">{t('ollama_local')}</option>
+                      <option value="perplexity">{t('perplexity_api')}</option>
                     </select>
                   </div>
                 </div>
@@ -584,11 +598,11 @@ export function Settings() {
               {/* Ollama Settings */}
               {llmSettings.find(s => s.key === 'llm_provider')?.value === 'ollama' && (
                 <div className="card">
-                  <h3 className="text-lg font-semibold text-secondary-900 mb-4">Ollama Configuration</h3>
+                  <h3 className="text-lg font-semibold text-secondary-900 mb-4">{t('ollama_configuration')}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-2">
-                        Base URL
+                        {t('base_url')}
                       </label>
                       <input
                         type="text"
@@ -601,7 +615,7 @@ export function Settings() {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-2">
-                        Model
+                        {t('model')}
                       </label>
                       <input
                         type="text"
@@ -619,24 +633,24 @@ export function Settings() {
               {/* Perplexity Settings */}
               {llmSettings.find(s => s.key === 'llm_provider')?.value === 'perplexity' && (
                 <div className="card">
-                  <h3 className="text-lg font-semibold text-secondary-900 mb-4">Perplexity Configuration</h3>
+                  <h3 className="text-lg font-semibold text-secondary-900 mb-4">{t('perplexity_configuration')}</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-2">
-                        API Key
+                        {t('api_key')}
                       </label>
                       <input
                         type="password"
                         value={llmSettings.find(s => s.key === 'perplexity_api_key')?.value || ''}
                         onChange={(e) => handleLlmSettingChange('perplexity_api_key', (e.target as HTMLInputElement).value)}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        placeholder="Enter your Perplexity API key"
+                        placeholder={t('enter_perplexity_api_key')}
                         disabled={llmLoading}
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-secondary-700 mb-2">
-                        Model
+                        {t('model')}
                       </label>
                       <select
                         value={llmSettings.find(s => s.key === 'perplexity_model')?.value || 'llama-3.1-sonar-small-128k-online'}
@@ -660,14 +674,14 @@ export function Settings() {
                   disabled={testingConnection || llmLoading}
                   className="px-4 py-2 text-sm font-medium text-primary-600 bg-white border border-primary-300 rounded-md hover:bg-primary-50 disabled:opacity-50"
                 >
-                  {testingConnection ? 'Testing...' : 'Test Connection'}
+                  {testingConnection ? t('testing') : t('test_connection')}
                 </button>
                 <button
                   onClick={handleSaveLlmSettings}
                   disabled={llmLoading}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {llmLoading ? 'Saving...' : 'Save Settings'}
+                  {llmLoading ? t('saving') : t('save_settings')}
                 </button>
               </div>
             </>
