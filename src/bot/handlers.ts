@@ -431,7 +431,9 @@ ${conversationContext}
                 }
             }
 
-            await this.conversationService.addMessage(chatId, 'ai', rawOutput, user, userState.currentVacancyId);
+            // Store the formatted response in the database, not the raw JSON
+            const formattedResponse = this.toFlatString(responseText);
+            await this.conversationService.addMessage(chatId, 'ai', formattedResponse, user, userState.currentVacancyId);
 
             // Check if interview is completed
             if (userState.questionCount >= 5) {
@@ -440,7 +442,7 @@ ${conversationContext}
             }
 
             stopTyping();
-            await this.bot.sendMessage(chatId, this.toFlatString(responseText));
+            await this.bot.sendMessage(chatId, formattedResponse);
             logger.info('Chat message processed', { chatId, questionCount: userState.questionCount });
         } catch (error) {
             stopTyping();

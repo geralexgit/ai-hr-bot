@@ -34,7 +34,7 @@ export class EvaluationRepository extends BaseRepository<Evaluation, CreateEvalu
   async findByCandidateId(candidateId: number): Promise<Evaluation[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE candidate_id = $1 ORDER BY created_at DESC`, [candidateId]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find evaluations by candidate ID`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -50,7 +50,7 @@ export class EvaluationRepository extends BaseRepository<Evaluation, CreateEvalu
   async findByVacancyId(vacancyId: number): Promise<Evaluation[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE vacancy_id = $1 ORDER BY created_at DESC`, [vacancyId]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find evaluations by vacancy ID`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -66,7 +66,7 @@ export class EvaluationRepository extends BaseRepository<Evaluation, CreateEvalu
   async findByRecommendation(recommendation: 'proceed' | 'reject' | 'clarify'): Promise<Evaluation[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE recommendation = $1 ORDER BY created_at DESC`, [recommendation]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find evaluations by recommendation`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -82,7 +82,7 @@ export class EvaluationRepository extends BaseRepository<Evaluation, CreateEvalu
   async findByMinScore(minScore: number): Promise<Evaluation[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE overall_score >= $1 ORDER BY overall_score DESC`, [minScore]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find evaluations by minimum score`, {
         error: error instanceof Error ? error.message : 'Unknown error',

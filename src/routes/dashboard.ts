@@ -2,6 +2,7 @@ import express from 'express';
 import { VacancyRepository } from '../repositories/VacancyRepository.js';
 import { CandidateRepository } from '../repositories/CandidateRepository.js';
 import { EvaluationRepository } from '../repositories/EvaluationRepository.js';
+import { DialogueRepository } from '../repositories/DialogueRepository.js';
 import { ApiResponse } from '../types/index.js';
 import { logger } from '../utils/logger.js';
 import { db } from '../database/connection.js';
@@ -10,6 +11,7 @@ const router = express.Router();
 const vacancyRepository = new VacancyRepository();
 const candidateRepository = new CandidateRepository();
 const evaluationRepository = new EvaluationRepository();
+const dialogueRepository = new DialogueRepository();
 
 // GET /dashboard/stats - Get dashboard statistics
 router.get('/stats', async (req, res) => {
@@ -183,6 +185,222 @@ router.get('/trends', async (req, res) => {
       error: {
         code: 'FETCH_DASHBOARD_TRENDS_ERROR',
         message: 'Failed to fetch dashboard trends',
+      },
+    };
+
+    res.status(500).json(response);
+    return;
+  }
+});
+
+// GET /dashboard/candidates - Get candidates list with vacancy information
+router.get('/candidates', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const offset = (page - 1) * limit;
+
+    // Get candidates with their latest vacancy application and evaluation
+    const candidatesResult = await db.query(`
+      SELECT 
+        c.id,
+        c.telegram_user_id,
+        c.first_name,
+        c.last_name,
+        c.username,
+        c.created_at,
+        v.id as vacancy_id,
+        v.title as vacancy_title,
+        e.id as evaluation_id,
+        e.overall_score,
+        e.recommendation,
+        e.created_at as evaluation_date,
+        COUNT(*) OVER() as total_count
+      FROM candidates c
+      LEFT JOIN LATERAL (
+        SELECT DISTINCT ON (candidate_id) 
+          candidate_id, vacancy_id
+        FROM dialogues 
+        WHERE candidate_id = c.id
+        ORDER BY candidate_id, created_at DESC
+      ) d ON d.candidate_id = c.id
+      LEFT JOIN vacancies v ON d.vacancy_id = v.id
+      LEFT JOIN LATERAL (
+        SELECT * FROM evaluations 
+        WHERE candidate_id = c.id AND vacancy_id = d.vacancy_id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) e ON true
+      ORDER BY c.created_at DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
+
+    const totalCandidates = candidatesResult.rows.length > 0 
+      ? parseInt(candidatesResult.rows[0].total_count, 10) 
+      : 0;
+    
+    const totalPages = Math.ceil(totalCandidates / limit);
+
+    const candidates = candidatesResult.rows.map(row => ({
+      id: row.id,
+      telegramUserId: row.telegram_user_id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      username: row.username,
+      createdAt: row.created_at,
+      vacancy: row.vacancy_id ? {
+        id: row.vacancy_id,
+        title: row.vacancy_title,
+      } : null,
+      evaluation: row.evaluation_id ? {
+        id: row.evaluation_id,
+        overallScore: row.overall_score,
+        recommendation: row.recommendation,
+        evaluationDate: row.evaluation_date,
+      } : null,
+    }));
+
+    const response: ApiResponse<any> = {
+      success: true,
+      data: {
+        candidates,
+        pagination: {
+          page,
+          limit,
+          total: totalCandidates,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1,
+        },
+      },
+    };
+
+    res.json(response);
+    return;
+  } catch (error) {
+    logger.error('Failed to fetch candidates list', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    const response: ApiResponse<null> = {
+      success: false,
+      error: {
+        code: 'FETCH_CANDIDATES_ERROR',
+        message: 'Failed to fetch candidates list',
+      },
+    };
+
+    res.status(500).json(response);
+    return;
+  }
+});
+
+// GET /dashboard/candidates/:candidateId/dialogues - Get dialogue history for a candidate
+router.get('/candidates/:candidateId/dialogues', async (req, res) => {
+  try {
+    const candidateId = parseInt(req.params.candidateId);
+    const vacancyId = req.query.vacancyId ? parseInt(req.query.vacancyId as string) : null;
+    
+    if (isNaN(candidateId)) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'INVALID_CANDIDATE_ID',
+          message: 'Invalid candidate ID provided',
+        },
+      };
+      res.status(400).json(response);
+      return;
+    }
+
+    // Verify candidate exists
+    const candidate = await candidateRepository.findById(candidateId);
+    if (!candidate) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: {
+          code: 'CANDIDATE_NOT_FOUND',
+          message: 'Candidate not found',
+        },
+      };
+      res.status(404).json(response);
+      return;
+    }
+
+    let dialogues;
+    let vacancy = null;
+
+    if (vacancyId) {
+      // Get dialogues for specific vacancy
+      if (isNaN(vacancyId)) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: {
+            code: 'INVALID_VACANCY_ID',
+            message: 'Invalid vacancy ID provided',
+          },
+        };
+        res.status(400).json(response);
+        return;
+      }
+
+      // Verify vacancy exists
+      vacancy = await vacancyRepository.findById(vacancyId);
+      if (!vacancy) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: {
+            code: 'VACANCY_NOT_FOUND',
+            message: 'Vacancy not found',
+          },
+        };
+        res.status(404).json(response);
+        return;
+      }
+
+      dialogues = await dialogueRepository.getConversationHistory(candidateId, vacancyId, 100);
+    } else {
+      // Get all dialogues for candidate
+      dialogues = await dialogueRepository.findByCandidateId(candidateId);
+    }
+
+    // Get vacancy information for each dialogue if not already provided
+    const vacancyIds = [...new Set(dialogues.map(d => d.vacancyId))];
+    const vacancies = await Promise.all(
+      vacancyIds.map(id => vacancyRepository.findById(id))
+    );
+    const vacancyMap = new Map(vacancies.filter(v => v).map(v => [v!.id, v!]));
+
+    // Enrich dialogues with vacancy information
+    const enrichedDialogues = dialogues.map(dialogue => ({
+      ...dialogue,
+      vacancy: vacancyMap.get(dialogue.vacancyId) || null,
+    }));
+
+    const response: ApiResponse<any> = {
+      success: true,
+      data: {
+        candidate,
+        vacancy,
+        dialogues: enrichedDialogues,
+        totalMessages: dialogues.length,
+      },
+    };
+
+    res.json(response);
+    return;
+  } catch (error) {
+    logger.error('Failed to fetch candidate dialogues', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      candidateId: req.params.candidateId,
+      vacancyId: req.query.vacancyId,
+    });
+
+    const response: ApiResponse<null> = {
+      success: false,
+      error: {
+        code: 'FETCH_DIALOGUES_ERROR',
+        message: 'Failed to fetch candidate dialogues',
       },
     };
 
