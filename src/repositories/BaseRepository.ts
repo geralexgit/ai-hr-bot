@@ -30,6 +30,11 @@ export abstract class BaseRepository<T, CreateDto, UpdateDto> {
       return obj;
     }
 
+    // Handle Date objects specifically
+    if (obj instanceof Date) {
+      return obj;
+    }
+
     if (Array.isArray(obj)) {
       return obj.map(item => this.convertKeysToSnakeCase(item));
     }

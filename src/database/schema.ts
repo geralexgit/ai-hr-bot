@@ -31,6 +31,10 @@ export class DatabaseSchema {
           first_name VARCHAR(255),
           last_name VARCHAR(255),
           username VARCHAR(255),
+          cv_file_path VARCHAR(500),
+          cv_file_name VARCHAR(255),
+          cv_file_size INTEGER,
+          cv_uploaded_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -42,10 +46,13 @@ export class DatabaseSchema {
           id SERIAL PRIMARY KEY,
           candidate_id INTEGER REFERENCES candidates(id) ON DELETE CASCADE,
           vacancy_id INTEGER REFERENCES vacancies(id) ON DELETE CASCADE,
-          message_type VARCHAR(50) NOT NULL CHECK (message_type IN ('text', 'audio', 'system')),
+          message_type VARCHAR(50) NOT NULL CHECK (message_type IN ('text', 'audio', 'system', 'document')),
           content TEXT NOT NULL,
           audio_file_path VARCHAR(500),
           transcription TEXT,
+          document_file_path VARCHAR(500),
+          document_file_name VARCHAR(255),
+          document_file_size INTEGER,
           sender VARCHAR(50) NOT NULL CHECK (sender IN ('candidate', 'bot')),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

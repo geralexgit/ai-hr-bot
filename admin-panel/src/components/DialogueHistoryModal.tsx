@@ -67,6 +67,13 @@ export function DialogueHistoryModal({
     setExpandedMessages(newExpanded)
   }
 
+  const formatFileSize = (bytes?: number) => {
+    if (!bytes) return 'Unknown size'
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(1024))
+    return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+  }
+
   const renderMessage = (dialogue: Dialogue) => {
     const isExpanded = expandedMessages.has(dialogue.id)
     
@@ -105,6 +112,11 @@ export function DialogueHistoryModal({
                 Audio Message
               </span>
             )}
+            {dialogue.messageType === 'document' && (
+              <span className="inline-flex px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">
+                Document
+              </span>
+            )}
           </div>
           <span className="text-xs text-secondary-500">
             {formatMessageTime(dialogue.createdAt)}
@@ -141,6 +153,22 @@ export function DialogueHistoryModal({
         {dialogue.audioFilePath && (
           <div className="mt-2 text-xs text-secondary-500">
             Audio file: {dialogue.audioFilePath}
+          </div>
+        )}
+
+        {dialogue.messageType === 'document' && dialogue.documentFilePath && (
+          <div className="mt-3 p-3 bg-orange-50 border border-orange-200 rounded-md">
+            <div className="flex items-center gap-2 text-sm text-orange-800 mb-1">
+              <span>📄</span>
+              <span className="font-medium">Uploaded Document</span>
+            </div>
+            <div className="text-xs text-orange-700 space-y-1">
+              <div><span className="font-medium">File:</span> {dialogue.documentFileName || 'Unknown'}</div>
+              <div><span className="font-medium">Size:</span> {formatFileSize(dialogue.documentFileSize)}</div>
+              <div className="text-orange-600 italic text-[10px] break-all">
+                Path: {dialogue.documentFilePath}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -203,7 +231,7 @@ export function DialogueHistoryModal({
             <div>
               {/* Summary */}
               <div className="bg-secondary-50 rounded-lg p-4 mb-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
                   <div>
                     <div className="text-2xl font-bold text-primary-600">
                       {dialogueData.totalMessages || 0}
@@ -228,7 +256,28 @@ export function DialogueHistoryModal({
                     </div>
                     <div className="text-sm text-secondary-600">Audio Messages</div>
                   </div>
+                  <div>
+                    <div className="text-2xl font-bold text-orange-600">
+                      {dialogueData.dialogues?.filter(d => d.messageType === 'document').length || 0}
+                    </div>
+                    <div className="text-sm text-secondary-600">Documents</div>
+                  </div>
                 </div>
+                
+                {/* CV Information */}
+                {dialogueData.candidate.cvFilePath && (
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                    <div className="flex items-center gap-2 text-sm text-blue-800 mb-2">
+                      <span>📄</span>
+                      <span className="font-medium">CV/Resume on file</span>
+                    </div>
+                    <div className="text-xs text-blue-700 grid grid-cols-1 md:grid-cols-3 gap-2">
+                      <div><span className="font-medium">File:</span> {dialogueData.candidate.cvFileName || 'Unknown'}</div>
+                      <div><span className="font-medium">Size:</span> {formatFileSize(dialogueData.candidate.cvFileSize)}</div>
+                      <div><span className="font-medium">Uploaded:</span> {dialogueData.candidate.cvUploadedAt ? formatMessageTime(dialogueData.candidate.cvUploadedAt) : 'Unknown'}</div>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Vacancy Info */}

@@ -1,6 +1,7 @@
 import TelegramBot, { Message, CallbackQuery } from 'node-telegram-bot-api';
 import { OllamaService } from '../services/ollama.service.js';
 import { ConversationService } from '../services/conversation.service.js';
+import { FileStorageService } from '../services/file-storage.service.js';
 import { VacancyRepository } from '../repositories/VacancyRepository.js';
 import { CandidateRepository } from '../repositories/CandidateRepository.js';
 import { UserState } from '../types/index.js';
@@ -11,6 +12,7 @@ export class BotHandlers {
     private userStates = new Map<number, UserState>();
     private vacancyRepository = new VacancyRepository();
     private candidateRepository = new CandidateRepository();
+    private fileStorageService = new FileStorageService();
 
     constructor(
         private bot: TelegramBot,
@@ -23,6 +25,7 @@ export class BotHandlers {
         this.bot.onText(/\/help/, this.handleHelp.bind(this));
         this.bot.onText(/\/clear/, this.handleClear.bind(this));
         this.bot.on('callback_query', this.handleCallbackQuery.bind(this));
+        this.bot.on('document', this.handleDocument.bind(this));
         this.bot.on('message', this.handleMessage.bind(this));
     }
 
@@ -142,7 +145,11 @@ export class BotHandlers {
 
 ${vacancy.description}
 
-Теперь давайте проведем интервью. Расскажите о себе и своем опыте работы.`;
+Теперь давайте проведем интервью. Вы можете:
+1. Загрузить свое резюме (PDF, DOC, DOCX, TXT)
+2. Или просто рассказать о себе и своем опыте работы
+
+Начнем!`;
 
             this.bot.sendMessage(chatId, message);
             
@@ -163,15 +170,19 @@ ${vacancy.description}
 
         this.bot.sendMessage(chatId, `Я HR-ассистент для проведения интервью и анализа резюме.
 
-Для анализа резюме отправьте сообщение в формате:
-Вакансия: [описание вакансии]
-Резюме: [текст резюме]
+Возможности:
+• Загрузка резюме (PDF, DOC, DOCX, TXT файлы)
+• Интерактивное интервью по выбранной вакансии
+• Анализ соответствия требованиям вакансии
 
-Для чата просто отправьте сообщение, и я отвечу как HR-ассистент.
+Как использовать:
+1. Выберите вакансию командой /start
+2. Загрузите резюме или расскажите о себе
+3. Отвечайте на вопросы интервью
 
 Команды:
-/start - начать
-/help - помощь
+/start - начать выбор вакансии
+/help - показать эту справку
 /clear - очистить историю разговора`);
     }
 
@@ -182,6 +193,216 @@ ${vacancy.description}
         logger.info('Cleared conversation for chat', { chatId });
 
         this.bot.sendMessage(chatId, 'История разговора очищена.');
+    }
+
+    private async handleDocument(msg: Message): Promise<void> {
+        const chatId = msg.chat.id;
+        const document = msg.document;
+
+        if (!document) return;
+
+        // Check user state
+        const userState = this.userStates.get(chatId);
+        
+        if (!userState || userState.stage === 'selecting_vacancy') {
+            this.bot.sendMessage(chatId, 'Пожалуйста, сначала выберите вакансию с помощью команды /start');
+            return;
+        }
+
+        if (!userState.currentVacancyId) {
+            this.bot.sendMessage(chatId, 'Произошла ошибка. Пожалуйста, выберите вакансию заново с помощью /start');
+            return;
+        }
+
+        logger.info('Document received', { 
+            chatId, 
+            fileName: document.file_name, 
+            fileSize: document.file_size,
+            vacancyId: userState.currentVacancyId 
+        });
+
+        await this.bot.sendChatAction(chatId, 'upload_document');
+
+        try {
+            // Validate file
+            if (!document.file_name) {
+                this.bot.sendMessage(chatId, 'Не удалось получить имя файла. Попробуйте загрузить файл заново.');
+                return;
+            }
+
+            if (document.file_size && document.file_size > 10 * 1024 * 1024) {
+                this.bot.sendMessage(chatId, 'Файл слишком большой. Максимальный размер: 10MB');
+                return;
+            }
+
+            // Get candidate
+            const candidate = await this.candidateRepository.findByTelegramUserId(msg.from?.id || 0);
+            if (!candidate) {
+                this.bot.sendMessage(chatId, 'Произошла ошибка при определении пользователя. Попробуйте /start');
+                return;
+            }
+
+            // Download and store file
+            const fileResult = await this.fileStorageService.downloadTelegramFile(
+                this.bot,
+                document.file_id,
+                document.file_name,
+                candidate.id
+            );
+
+            // Update candidate with CV info
+            await this.candidateRepository.update(candidate.id, {
+                cvFilePath: fileResult.filePath,
+                cvFileName: fileResult.fileName,
+                cvFileSize: fileResult.fileSize,
+                cvUploadedAt: new Date()
+            });
+
+            // Store in dialogue history
+            const telegramUser = msg.from ? {
+                id: msg.from.id,
+                first_name: msg.from.first_name,
+                ...(msg.from.last_name && { last_name: msg.from.last_name }),
+                ...(msg.from.username && { username: msg.from.username })
+            } : undefined;
+
+            await this.conversationService.addMessage(
+                chatId, 
+                'user', 
+                `Загружено резюме: ${document.file_name}`,
+                telegramUser,
+                userState.currentVacancyId,
+                'document',
+                undefined,
+                fileResult.filePath,
+                fileResult.fileName,
+                fileResult.fileSize
+            );
+
+            // Try to extract file content for analysis
+            let fileContent = '';
+            try {
+                fileContent = await this.fileStorageService.getFileContent(fileResult.filePath);
+            } catch (error) {
+                logger.warn('Could not extract file content', { filePath: fileResult.filePath, error });
+            }
+
+            // Analyze the uploaded CV
+            await this.analyzeUploadedCV(chatId, fileContent, document.file_name, userState);
+
+        } catch (error) {
+            logger.error('Error handling document upload', { chatId, error });
+            
+            if (error instanceof Error) {
+                if (error.message.includes('File extension') || error.message.includes('not allowed')) {
+                    this.bot.sendMessage(chatId, 'Неподдерживаемый формат файла. Поддерживаются: PDF, DOC, DOCX, TXT');
+                } else if (error.message.includes('File size')) {
+                    this.bot.sendMessage(chatId, 'Файл слишком большой. Максимальный размер: 10MB');
+                } else {
+                    this.bot.sendMessage(chatId, 'Произошла ошибка при загрузке файла. Попробуйте еще раз.');
+                }
+            } else {
+                this.bot.sendMessage(chatId, 'Произошла ошибка при загрузке файла. Попробуйте еще раз.');
+            }
+        }
+    }
+
+    private async analyzeUploadedCV(chatId: number, fileContent: string, fileName: string, userState: UserState): Promise<void> {
+        const stopTyping = this.startTypingIndicator(chatId);
+
+        try {
+            // Get vacancy information for context
+            let vacancyContext = '';
+            try {
+                const vacancy = await this.vacancyRepository.findById(userState.currentVacancyId!);
+                if (vacancy) {
+                    vacancyContext = `
+Вакансия: ${vacancy.title}
+Описание: ${vacancy.description}
+Требования: ${JSON.stringify(vacancy.requirements, null, 2)}
+Веса оценки: технические навыки ${vacancy.evaluationWeights.technicalSkills}%, коммуникация ${vacancy.evaluationWeights.communication}%, решение задач ${vacancy.evaluationWeights.problemSolving}%
+`;
+                }
+            } catch (error) {
+                logger.error('Error loading vacancy context for CV analysis', { vacancyId: userState.currentVacancyId, error });
+            }
+
+            const prompt = `
+Ты — HR-ассистент, анализирующий загруженное резюме кандидата.
+
+${vacancyContext}
+
+Файл резюме: ${fileName}
+Содержимое резюме: ${fileContent || '[Содержимое файла не удалось извлечь, но файл был загружен]'}
+
+Твоя задача:
+1. Проанализируй резюме в контексте конкретной вакансии
+2. Извлеки ключевые навыки, опыт работы и образование
+3. Оцени соответствие требованиям вакансии
+4. Определи сильные стороны и пробелы
+5. Задай первый уместный вопрос для углубленного интервью
+
+ВАЖНО: Верни ответ строго ТОЛЬКО в JSON формате с полями:
+{
+  "analysis": "краткий анализ резюме и соответствия вакансии",
+  "strengths": "выявленные сильные стороны кандидата",
+  "gaps": "обнаруженные пробелы или области для уточнения",
+  "first_question": "первый вопрос для интервью на основе анализа резюме"
+}
+`;
+
+            const rawOutput = await this.ollamaService.generate(prompt);
+            let responseText: string;
+
+            try {
+                const data = JSON.parse(rawOutput.replace(/```json|```/g, '').trim());
+                responseText = `📄 Анализ вашего резюме:
+
+${data.analysis || 'Резюме получено и проанализировано.'}
+
+✅ Сильные стороны:
+${data.strengths || 'Анализ в процессе...'}
+
+⚠️ Области для обсуждения:
+${data.gaps || 'Будем обсуждать в ходе интервью.'}
+
+❓ Первый вопрос:
+${data.first_question || 'Расскажите подробнее о своем опыте работы.'}`;
+            } catch (error) {
+                // Fallback if JSON parsing fails
+                responseText = `📄 Ваше резюме успешно загружено и проанализировано!
+
+Файл: ${fileName}
+
+Теперь давайте проведем интервью на основе вашего резюме. Расскажите подробнее о своем опыте работы и ключевых достижениях.`;
+            }
+
+            // Store the AI response
+            await this.conversationService.addMessage(chatId, 'ai', responseText, undefined, userState.currentVacancyId);
+
+            // Update user state
+            userState.questionCount++;
+            userState.lastActivity = new Date();
+            this.userStates.set(chatId, userState);
+
+            stopTyping();
+            await this.bot.sendMessage(chatId, responseText);
+            
+            logger.info('CV analysis completed', { chatId, fileName, vacancyId: userState.currentVacancyId });
+
+        } catch (error) {
+            stopTyping();
+            logger.error('Error in CV analysis', { chatId, fileName, error });
+            
+            const fallbackMessage = `📄 Ваше резюме успешно загружено!
+
+Файл: ${fileName}
+
+К сожалению, не удалось выполнить автоматический анализ, но мы можем продолжить интервью. Расскажите о своем опыте работы и ключевых навыках.`;
+            
+            await this.conversationService.addMessage(chatId, 'ai', fallbackMessage, undefined, userState.currentVacancyId);
+            this.bot.sendMessage(chatId, fallbackMessage);
+        }
     }
 
     private async handleMessage(msg: Message): Promise<void> {

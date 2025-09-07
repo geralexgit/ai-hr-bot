@@ -72,6 +72,10 @@ export interface Candidate {
   firstName?: string;
   lastName?: string;
   username?: string;
+  cvFilePath?: string;
+  cvFileName?: string;
+  cvFileSize?: number;
+  cvUploadedAt?: Date;
   createdAt: Date;
 }
 
@@ -80,22 +84,33 @@ export interface CreateCandidateDto {
   firstName?: string;
   lastName?: string;
   username?: string;
+  cvFilePath?: string;
+  cvFileName?: string;
+  cvFileSize?: number;
+  cvUploadedAt?: Date;
 }
 
 export interface UpdateCandidateDto {
   firstName?: string | undefined;
   lastName?: string | undefined;
   username?: string | undefined;
+  cvFilePath?: string | undefined;
+  cvFileName?: string | undefined;
+  cvFileSize?: number | undefined;
+  cvUploadedAt?: Date | undefined;
 }
 
 export interface Dialogue {
   id: number;
   candidateId: number;
   vacancyId: number;
-  messageType: 'text' | 'audio' | 'system';
+  messageType: 'text' | 'audio' | 'system' | 'document';
   content: string;
   audioFilePath?: string;
   transcription?: string;
+  documentFilePath?: string;
+  documentFileName?: string;
+  documentFileSize?: number;
   sender: 'candidate' | 'bot';
   createdAt: Date;
 }
@@ -103,18 +118,24 @@ export interface Dialogue {
 export interface CreateDialogueDto {
   candidateId: number;
   vacancyId: number;
-  messageType: 'text' | 'audio' | 'system';
+  messageType: 'text' | 'audio' | 'system' | 'document';
   content: string;
   audioFilePath?: string;
   transcription?: string;
+  documentFilePath?: string;
+  documentFileName?: string;
+  documentFileSize?: number;
   sender: 'candidate' | 'bot';
 }
 
 export interface UpdateDialogueDto {
-  messageType?: 'text' | 'audio' | 'system';
+  messageType?: 'text' | 'audio' | 'system' | 'document';
   content?: string;
   audioFilePath?: string;
   transcription?: string;
+  documentFilePath?: string;
+  documentFileName?: string;
+  documentFileSize?: number;
 }
 
 export interface ExtractedSkill {

@@ -6,10 +6,13 @@ export interface Dialogue {
   id: number
   candidateId: number
   vacancyId: number
-  messageType: 'text' | 'audio' | 'system'
+  messageType: 'text' | 'audio' | 'system' | 'document'
   content: string
   audioFilePath?: string
   transcription?: string
+  documentFilePath?: string
+  documentFileName?: string
+  documentFileSize?: number
   sender: 'candidate' | 'bot'
   createdAt: string
   vacancy?: {
@@ -27,6 +30,10 @@ export interface DialogueHistoryResponse {
     firstName?: string
     lastName?: string
     username?: string
+    cvFilePath?: string
+    cvFileName?: string
+    cvFileSize?: number
+    cvUploadedAt?: string
     createdAt: string
   }
   vacancy?: {
@@ -153,7 +160,7 @@ export const formatMessageTime = (dateString: string | null | undefined): string
 }
 
 // Helper function to get message type icon
-export const getMessageTypeIcon = (messageType: 'text' | 'audio' | 'system'): string => {
+export const getMessageTypeIcon = (messageType: 'text' | 'audio' | 'system' | 'document'): string => {
   switch (messageType) {
     case 'text':
       return '💬'
@@ -161,6 +168,8 @@ export const getMessageTypeIcon = (messageType: 'text' | 'audio' | 'system'): st
       return '🎵'
     case 'system':
       return '⚙️'
+    case 'document':
+      return '📄'
     default:
       return '📝'
   }
