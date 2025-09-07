@@ -2,6 +2,7 @@ import TelegramBot, { Message, CallbackQuery } from 'node-telegram-bot-api';
 import { OllamaService } from '../services/ollama.service.js';
 import { ConversationService } from '../services/conversation.service.js';
 import { FileStorageService } from '../services/file-storage.service.js';
+import { EvaluationService } from '../services/evaluation.service.js';
 import { VacancyRepository } from '../repositories/VacancyRepository.js';
 import { CandidateRepository } from '../repositories/CandidateRepository.js';
 import { UserState } from '../types/index.js';
@@ -13,6 +14,7 @@ export class BotHandlers {
     private vacancyRepository = new VacancyRepository();
     private candidateRepository = new CandidateRepository();
     private fileStorageService = new FileStorageService();
+    private evaluationService = new EvaluationService();
 
     constructor(
         private bot: TelegramBot,
@@ -660,15 +662,73 @@ ${conversationContext}
             if (userState.questionCount >= 5) {
                 userState.stage = 'completed';
                 this.userStates.set(chatId, userState);
-            }
 
-            stopTyping();
-            await this.bot.sendMessage(chatId, formattedResponse);
+                // Trigger evaluation after interview completion
+                try {
+                    await this.generateAndSendEvaluation(chatId, userState.currentVacancyId!);
+                } catch (error) {
+                    logger.error('Error generating evaluation after interview completion', { 
+                        chatId, 
+                        vacancyId: userState.currentVacancyId, 
+                        error 
+                    });
+                    // Don't let evaluation errors affect the main flow
+                    await this.bot.sendMessage(chatId, 
+                        'Интервью завершено! Мы обработаем ваши ответы и свяжемся с вами в ближайшее время.'
+                    );
+                }
+            } else {
+                stopTyping();
+                await this.bot.sendMessage(chatId, formattedResponse);
+            }
+            
             logger.info('Chat message processed', { chatId, questionCount: userState.questionCount });
         } catch (error) {
             stopTyping();
             logger.error('Error in chat processing', { chatId, error });
             this.bot.sendMessage(chatId, 'Ошибка при обработке сообщения. Попробуйте еще раз.');
+        }
+    }
+
+    /**
+     * Generate evaluation and send feedback to candidate
+     */
+    private async generateAndSendEvaluation(chatId: number, vacancyId: number): Promise<void> {
+        const stopTyping = this.startTypingIndicator(chatId);
+
+        try {
+            logger.info('Generating evaluation for completed interview', { chatId, vacancyId });
+
+            // Generate evaluation
+            const evaluationResult = await this.evaluationService.generateEvaluation(chatId, vacancyId);
+
+            stopTyping();
+
+            // Send evaluation feedback to candidate
+            await this.bot.sendMessage(chatId, evaluationResult.feedback, {
+                parse_mode: 'Markdown'
+            });
+
+            // Log successful evaluation
+            logger.info('Evaluation completed and sent to candidate', {
+                chatId,
+                vacancyId,
+                evaluationId: evaluationResult.evaluation.id,
+                overallScore: evaluationResult.evaluation.overallScore,
+                recommendation: evaluationResult.evaluation.recommendation
+            });
+
+        } catch (error) {
+            stopTyping();
+            logger.error('Failed to generate evaluation', { chatId, vacancyId, error });
+            
+            // Send fallback message
+            await this.bot.sendMessage(chatId, 
+                '🎯 Интервью завершено!\n\n' +
+                'Спасибо за участие в собеседовании. Мы тщательно рассмотрим ваши ответы и ' +
+                'свяжемся с вами в ближайшее время с результатами.\n\n' +
+                'Хорошего дня! 😊'
+            );
         }
     }
 }
