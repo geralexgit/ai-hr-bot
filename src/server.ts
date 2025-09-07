@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import fs from 'fs';
 import { config } from './config/environment.js';
 import { logger } from './utils/logger.js';
 import vacancyRoutes from './routes/vacancies.js';
@@ -59,6 +61,85 @@ class ApiServer {
     this.app.use('/api/candidates', candidateRoutes);
     this.app.use('/api/evaluations', evaluationRoutes);
     this.app.use('/api/dashboard', dashboardRoutes);
+
+    // File serving endpoint for CV files
+    this.app.get('/api/files/cv/:candidateId/:filename', (req, res) => {
+      try {
+        const { candidateId, filename } = req.params;
+        // Decode the URL-encoded filename to handle Cyrillic and special characters
+        const decodedFilename = decodeURIComponent(filename);
+        const filePath = path.join(process.cwd(), 'uploads', decodedFilename);
+        
+        // Security check: ensure the filename contains the candidate ID
+        if (!decodedFilename.startsWith(`${candidateId}_`)) {
+          res.status(403).json({
+            success: false,
+            error: {
+              code: 'ACCESS_DENIED',
+              message: 'Access denied to this file',
+            },
+          });
+          return;
+        }
+
+        // Check if file exists
+        if (!fs.existsSync(filePath)) {
+          res.status(404).json({
+            success: false,
+            error: {
+              code: 'FILE_NOT_FOUND',
+              message: 'File not found',
+            },
+          });
+          return;
+        }
+
+        // Set appropriate headers for PDF files
+        const fileExtension = path.extname(decodedFilename).toLowerCase();
+        if (fileExtension === '.pdf') {
+          res.setHeader('Content-Type', 'application/pdf');
+          // Use RFC 5987 encoding for non-ASCII filenames in Content-Disposition
+          res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(decodedFilename)}`);
+        } else {
+          res.setHeader('Content-Type', 'application/octet-stream');
+          res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(decodedFilename)}`);
+        }
+
+        // Stream the file
+        const fileStream = fs.createReadStream(filePath);
+        fileStream.pipe(res);
+
+        fileStream.on('error', (error) => {
+          logger.error('Error streaming CV file', {
+            error: error.message,
+            candidateId,
+            filename,
+          });
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: {
+                code: 'FILE_STREAM_ERROR',
+                message: 'Error streaming file',
+              },
+            });
+          }
+        });
+      } catch (error) {
+        logger.error('Error in CV file endpoint', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          candidateId: req.params.candidateId,
+          filename: req.params.filename,
+        });
+        res.status(500).json({
+          success: false,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'Internal server error',
+          },
+        });
+      }
+    });
 
     // 404 handler
     this.app.use('*', (req, res) => {

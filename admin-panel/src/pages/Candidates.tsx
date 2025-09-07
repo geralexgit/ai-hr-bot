@@ -3,7 +3,8 @@ import {
   fetchCandidates, 
   Candidate, 
   formatCandidateName, 
-  getRecommendationBadgeColor 
+  getRecommendationBadgeColor,
+  getCvFileUrl
 } from '../services/candidatesService'
 import { DialogueHistoryModal } from '../components/DialogueHistoryModal'
 
@@ -62,6 +63,14 @@ export function Candidates() {
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedCandidate(null)
+  }
+
+  const handleCvPreview = (candidate: Candidate, event: Event) => {
+    event.stopPropagation() // Prevent row click
+    const cvUrl = getCvFileUrl(candidate)
+    if (cvUrl) {
+      window.open(cvUrl, '_blank')
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -150,6 +159,9 @@ export function Candidates() {
                       Score
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                      CV/Resume
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                       Registered
                     </th>
                   </tr>
@@ -210,6 +222,22 @@ export function Candidates() {
                           </div>
                         ) : (
                           <span className="text-sm text-secondary-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {candidate.cvFileName ? (
+                          <button
+                            onClick={(e) => handleCvPreview(candidate, e)}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                            title={`Preview CV: ${candidate.cvFileName}`}
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Preview CV
+                          </button>
+                        ) : (
+                          <span className="text-sm text-secondary-500 italic">No CV uploaded</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">

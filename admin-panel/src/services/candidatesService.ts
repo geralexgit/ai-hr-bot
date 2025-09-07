@@ -8,6 +8,10 @@ export interface Candidate {
   firstName?: string
   lastName?: string
   username?: string
+  cvFilePath?: string
+  cvFileName?: string
+  cvFileSize?: number
+  cvUploadedAt?: string
   createdAt: string
   vacancy?: {
     id: number
@@ -89,4 +93,23 @@ export const getRecommendationBadgeColor = (recommendation: 'proceed' | 'reject'
     default:
       return 'bg-gray-100 text-gray-800'
   }
+}
+
+// Helper function to generate CV file URL
+export const getCvFileUrl = (candidate: Candidate): string | null => {
+  if (!candidate.cvFileName || !candidate.cvFilePath) {
+    return null
+  }
+  // Properly encode the filename to handle Cyrillic and special characters
+  const encodedFilename = encodeURIComponent(candidate.cvFileName)
+  return `${API_BASE_URL}/api/files/cv/${candidate.id}/${encodedFilename}`
+}
+
+// Helper function to format file size
+export const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
