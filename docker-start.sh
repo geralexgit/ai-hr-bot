@@ -71,6 +71,8 @@ check_env_file() {
             print_info "Copying env.example to .env..."
             cp env.example .env
             print_warning "Please edit .env file and set your TELEGRAM_BOT_TOKEN"
+            print_info "Required: Set TELEGRAM_BOT_TOKEN in .env file"
+            print_info "Optional: Adjust other settings as needed"
             print_info "You can edit it now with: nano .env"
             read -p "Press Enter to continue after editing .env file..."
         else

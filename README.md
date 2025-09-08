@@ -1,6 +1,6 @@
 # AI HR Bot System
 
-A comprehensive AI-powered recruitment platform that transforms the basic Telegram bot into a full-featured HR system with PostgreSQL database integration, structured candidate evaluation, vacancy management, audio processing capabilities, and an admin panel.
+A comprehensive AI-powered recruitment platform that combines a Telegram bot with a full-featured HR management system. Features PostgreSQL database integration, structured candidate evaluation, vacancy management, audio processing capabilities, and a modern admin panel.
 
 ## Features
 
@@ -22,7 +22,7 @@ A comprehensive AI-powered recruitment platform that transforms the basic Telegr
 - **Gap Analysis**: Identify skill gaps and provide specific improvement suggestions
 - **Recommendation Engine**: Proceed/Reject/Clarify recommendations with confidence scores
 
-### 📊 Admin Panel (Upcoming)
+### 📊 Admin Panel
 - **Vacancy Management**: Create and manage job positions with detailed requirements
 - **Candidate Dashboard**: Review evaluations, conversation history, and pipeline status
 - **Analytics & Reporting**: Recruitment metrics, success rates, and performance insights
@@ -30,36 +30,77 @@ A comprehensive AI-powered recruitment platform that transforms the basic Telegr
 
 ## Prerequisites
 
-- Node.js 18+
+### For Local Development
+- Node.js 18+ 
 - PostgreSQL 15+ database server
 - Ollama running locally with the `gemma3n:latest` model
 - Telegram Bot Token (from @BotFather)
 
+### For Docker Deployment
+- Docker Engine 20.10+
+- Docker Compose 2.0+
+- Telegram Bot Token (from @BotFather)
+- Ollama running locally or accessible remotely
+
 ## Installation
 
-1. Clone the repository:
+Choose one of the following installation methods:
+
+### 🐳 Option 1: Docker Installation (Recommended)
+
+The easiest way to get started is using Docker:
+
+1. **Clone the repository:**
 ```bash
 git clone <repository-url>
-cd telegram-hr-bot
+cd ai-hr-bot
 ```
 
-2. Install dependencies:
+2. **Quick Docker setup:**
+```bash
+# Use the automated Docker startup script
+./docker-start.sh
+
+# Or manually with docker-compose
+cp env.example .env
+# Edit .env with your TELEGRAM_BOT_TOKEN
+docker-compose up -d
+```
+
+3. **Access the services:**
+- Admin Panel: http://localhost:3001
+- API Server: http://localhost:3000
+- Database: localhost:5432
+
+For detailed Docker configuration, see [DOCKER.md](./DOCKER.md).
+
+### 🔧 Option 2: Local Development Installation
+
+1. **Clone the repository:**
+```bash
+git clone <repository-url>
+cd ai-hr-bot
+```
+
+2. **Install dependencies:**
 ```bash
 npm install
 ```
 
-3. Set up environment variables:
+3. **Set up environment variables:**
 ```bash
-cp .env.example .env
+cp env.example .env
 # Edit .env with your actual values
 ```
 
-4. Build the project:
+4. **Build the project:**
 ```bash
 npm run build
 ```
 
-## Database Setup
+## Database Setup (Local Development Only)
+
+> **Note**: Skip this section if you're using Docker installation - the database is automatically set up.
 
 ### Quick Setup (Recommended)
 Use the automated setup script for the easiest experience:
@@ -119,29 +160,81 @@ DB_PASSWORD=your_secure_password_here
 DB_SSL=false
 DB_MAX_CONNECTIONS=20
 DB_IDLE_TIMEOUT=30000
-DB_CONNECTION_TIMEOUT=2000
+DB_CONNECTION_TIMEOUT=5000
 
 # Ollama Configuration
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_MODEL=gemma3n:latest
 
+# Perplexity API Configuration (Optional)
+PERPLEXITY_API_KEY=your_perplexity_api_key_here
+PERPLEXITY_MODEL=sonar-pro
+
 # Application Configuration
 PORT=3000
+FRONTEND_PORT=3001
 NODE_ENV=development
 LOG_LEVEL=info
+
+# CORS Configuration
+CORS_ORIGIN_DEV=http://localhost:5173,http://localhost:3001,http://localhost:3000
+CORS_ORIGIN_PROD=https://your-admin-panel-domain.com
+```
+
+### Docker-specific Configuration
+
+For Docker deployment, adjust these settings in your `.env` file:
+
+```env
+# Use Docker internal network
+DB_HOST=database
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+NODE_ENV=production
 ```
 
 ## Usage
 
-### Development
+### Docker Usage
 ```bash
-npm run dev
+# Start all services
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop services
+docker-compose down
+
+# Restart a specific service
+docker-compose restart backend
 ```
 
-### Production
+### Local Development
 ```bash
+# Development mode with hot reload
+npm run dev
+
+# Build and start production
 npm run build
 npm start
+
+# Start specific services
+npm run watch:bot    # Bot service only
+npm run watch:server # API server only
+npm run watch:ui     # Admin panel only
+```
+
+### Admin Panel Development
+```bash
+# Install admin panel dependencies
+cd admin-panel
+npm install
+
+# Start admin panel in development mode
+npm run dev
+
+# Build admin panel for production
+npm run build
 ```
 
 ### Bot Commands
@@ -175,39 +268,69 @@ Simply send any message (not in resume format) to start an interactive interview
 ## Project Structure
 
 ```
-src/
-├── app.ts                 # Main application entry point
-├── bot/
-│   └── handlers.ts        # Telegram bot message handlers
-├── config/
-│   └── environment.ts     # Environment configuration
-├── database/
-│   ├── index.ts           # Database module exports
-│   ├── connection.ts      # PostgreSQL connection pooling
-│   ├── schema.ts          # Database schema and migrations
-│   ├── init.ts            # Database initialization
-│   └── test.ts            # Database testing utilities
-├── services/
-│   ├── conversation.service.ts  # Conversation management
-│   └── ollama.service.ts        # Ollama API integration
-├── types/
-│   └── index.ts           # TypeScript type definitions
-└── utils/
-    └── logger.ts          # Logging utility
-setup-database.sh          # Automated database setup script
-.env.example              # Environment configuration template
+ai-hr-bot/
+├── src/                          # Backend source code
+│   ├── app.ts                   # Telegram bot entry point
+│   ├── server.ts                # API server entry point
+│   ├── bot/
+│   │   └── handlers.ts          # Telegram bot message handlers
+│   ├── config/
+│   │   └── environment.ts       # Environment configuration
+│   ├── database/
+│   │   ├── connection.ts        # PostgreSQL connection pooling
+│   │   ├── schema.ts            # Database schema definitions
+│   │   ├── init.ts              # Database initialization
+│   │   └── migrations/          # Database migration files
+│   ├── repositories/            # Data access layer
+│   ├── routes/                  # API route handlers
+│   ├── services/                # Business logic services
+│   ├── types/                   # TypeScript type definitions
+│   └── utils/                   # Utility functions
+├── admin-panel/                 # Frontend admin panel
+│   ├── src/
+│   │   ├── components/          # React/Preact components
+│   │   ├── pages/               # Application pages
+│   │   ├── services/            # API service layer
+│   │   └── types/               # Frontend type definitions
+│   ├── package.json             # Frontend dependencies
+│   └── Dockerfile               # Frontend Docker build
+├── docker/                      # Docker configuration
+│   └── init-db.sql             # Database initialization SQL
+├── uploads/                     # File upload storage
+├── setup-database.sh           # Database setup script
+├── docker-start.sh             # Docker startup script
+├── docker-compose.yml          # Docker services configuration
+├── env.example                 # Environment template
+├── Dockerfile                  # Backend Docker build
+├── Dockerfile.bot              # Bot Docker build
+├── DOCKER.md                   # Docker documentation
+└── README.md                   # This file
 ```
 
 ## Development
 
-### Scripts
+### Available Scripts
 
+#### Backend Scripts
 - `npm run dev` - Start development server with hot reload
 - `npm run build` - Build TypeScript to JavaScript
 - `npm run start` - Start production server
 - `npm run clean` - Clean build directory
 - `npm run lint` - Run ESLint
 - `npm run format` - Format code with Prettier
+- `npm run watch:bot` - Watch bot service only
+- `npm run watch:server` - Watch API server only
+
+#### Frontend Scripts
+- `npm run build:ui` - Build admin panel
+- `npm run lint:ui` - Lint admin panel code
+- `npm run format:ui` - Format admin panel code
+- `npm run watch:ui` - Start admin panel development server
+
+#### Docker Scripts
+- `./docker-start.sh` - Start all services with Docker
+- `./docker-start.sh --logs` - Start services and show logs
+- `./setup-database.sh` - Set up local PostgreSQL database
 
 ### Testing
 
@@ -240,16 +363,47 @@ The project uses:
 
 ## Deployment
 
-1. Build the project:
+### Docker Deployment (Recommended)
+
+1. **Prepare environment:**
 ```bash
-npm run build
+cp env.example .env
+# Edit .env with production values
 ```
 
-2. Set production environment variables
-3. Start the application:
+2. **Deploy with Docker Compose:**
+```bash
+# Start all services in production mode
+NODE_ENV=production docker-compose up -d
+
+# Check service health
+docker-compose ps
+```
+
+3. **Monitor services:**
+```bash
+# View logs
+docker-compose logs -f
+
+# Check specific service
+docker-compose logs backend
+```
+
+### Manual Deployment
+
+1. **Build the project:**
+```bash
+npm run build
+npm run build:ui
+```
+
+2. **Set production environment variables**
+3. **Start the application:**
 ```bash
 npm start
 ```
+
+For detailed deployment instructions, see [DOCKER.md](./DOCKER.md).
 
 ## Troubleshooting
 
@@ -296,6 +450,12 @@ The application provides detailed logging. Check console output for:
 3. Make your changes
 4. Add tests if applicable
 5. Submit a pull request
+
+## Author
+
+**Alexander Gerasimov**
+- Website: [agrsmv.ru](https://agrsmv.ru)
+- Telegram: [@geralex](https://t.me/geralex)
 
 ## License
 

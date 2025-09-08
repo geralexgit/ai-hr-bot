@@ -1,7 +1,7 @@
 {
-  "name": "telegram-hr-bot",
+  "name": "ai-hr-bot",
   "version": "1.0.0",
-  "description": "HR Assistant Telegram Bot with Ollama integration for resume analysis and interviews",
+  "description": "AI-powered HR recruitment platform with Telegram bot, admin panel, and PostgreSQL integration",
   "main": "dist/app.js",
   "type": "module",
   "scripts": {
@@ -28,7 +28,10 @@
     "interview",
     "resume"
   ],
-  "author": "Your Name",
+  "author": {
+    "name": "Alexander Gerasimov",
+    "url": "https://agrsmv.ru"
+  },
   "license": "MIT",
   "dependencies": {
     "@types/cors": "^2.8.19",
