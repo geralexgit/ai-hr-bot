@@ -11,17 +11,20 @@ export interface DialogueRecord {
     id?: number;
     candidate_id?: number;
     vacancy_id?: number;
-    message_type: 'text' | 'audio' | 'system';
+    message_type: 'text' | 'audio' | 'system' | 'document';
     content: string;
     audio_file_path?: string;
     transcription?: string;
+    document_file_path?: string;
+    document_file_name?: string;
+    document_file_size?: number;
     sender: 'candidate' | 'bot';
     created_at?: Date;
 }
 
 export interface TelegramUser {
     id: number;
-    first_name?: string;
+    first_name: string;
     last_name?: string;
     username?: string;
 }
@@ -73,7 +76,18 @@ export class ConversationService {
         }
     }
 
-    async addMessage(chatId: number, role: 'user' | 'ai', content: string, user?: TelegramUser, vacancyId?: number): Promise<void> {
+    async addMessage(
+        chatId: number, 
+        role: 'user' | 'ai', 
+        content: string, 
+        user?: TelegramUser, 
+        vacancyId?: number,
+        messageType: 'text' | 'audio' | 'system' | 'document' = 'text',
+        audioFilePath?: string,
+        documentFilePath?: string,
+        documentFileName?: string,
+        documentFileSize?: number
+    ): Promise<void> {
         try {
             const message: ConversationMessage = { role, content, timestamp: new Date() };
 
@@ -86,10 +100,24 @@ export class ConversationService {
             await this.ensureCandidateExists(chatId, user);
 
             const dialogueRecord: DialogueRecord = {
-                message_type: 'text',
+                message_type: messageType,
                 content: content,
                 sender: role === 'user' ? 'candidate' : 'bot'
             };
+
+            if (audioFilePath) {
+                dialogueRecord.audio_file_path = audioFilePath;
+            }
+
+            if (documentFilePath) {
+                dialogueRecord.document_file_path = documentFilePath;
+                if (documentFileName !== undefined) {
+                    dialogueRecord.document_file_name = documentFileName;
+                }
+                if (documentFileSize !== undefined) {
+                    dialogueRecord.document_file_size = documentFileSize;
+                }
+            }
 
             if (vacancyId) {
                 dialogueRecord.vacancy_id = vacancyId;
@@ -188,10 +216,10 @@ export class ConversationService {
     private async saveDialogueToDatabase(chatId: number, dialogue: DialogueRecord): Promise<void> {
         try {
             await db.query(
-                `INSERT INTO dialogues (candidate_id, vacancy_id, message_type, content, sender, created_at)
+                `INSERT INTO dialogues (candidate_id, vacancy_id, message_type, content, sender, audio_file_path, document_file_path, document_file_name, document_file_size, created_at)
                  VALUES (
                      (SELECT id FROM candidates WHERE telegram_user_id = $1),
-                     $2, $3, $4, $5, $6
+                     $2, $3, $4, $5, $6, $7, $8, $9, $10
                  )`,
                 [
                     chatId,
@@ -199,6 +227,10 @@ export class ConversationService {
                     dialogue.message_type,
                     dialogue.content,
                     dialogue.sender,
+                    dialogue.audio_file_path || null,
+                    dialogue.document_file_path || null,
+                    dialogue.document_file_name || null,
+                    dialogue.document_file_size || null,
                     dialogue.created_at || new Date()
                 ]
             );

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'preact/hooks'
 import { fetchVacancies, deleteVacancy, Vacancy } from '../services/vacanciesService'
 import { formatDate } from '../helpers'
+import { useI18n } from '../hooks/useI18n'
 
 export function Vacancies() {
+  const { t } = useI18n()
   const [vacancies, setVacancies] = useState<Vacancy[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -22,14 +24,14 @@ export function Vacancies() {
       }
       setVacancies(result.data)
     } else {
-      setError(result.error?.message || 'Failed to fetch vacancies')
+      setError(result.error?.message || t('failed_to_fetch_vacancies'))
     }
     setLoading(false)
   }
 
   const handleDeleteVacancy = async (vacancyId: number, vacancyTitle: string) => {
     // Confirm deletion
-    if (!confirm(`Are you sure you want to delete the vacancy "${vacancyTitle}"? This action cannot be undone.`)) {
+    if (!confirm(t('confirm_delete_vacancy', { title: vacancyTitle }))) {
       return
     }
 
@@ -44,10 +46,10 @@ export function Vacancies() {
         // Remove from local state
         setVacancies(prev => prev.filter(v => v.id !== vacancyId))
       } else {
-        setError(result.error?.message || 'Failed to delete vacancy')
+        setError(result.error?.message || t('failed_to_load', { item: 'vacancy' }))
       }
     } catch (err) {
-      setError('Network error occurred while deleting vacancy')
+      setError(t('network_error_delete_vacancy'))
     } finally {
       // Remove from deleting set
       setDeletingIds(prev => {
@@ -78,8 +80,8 @@ export function Vacancies() {
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Job Vacancies</h1>
-            <p className="text-gray-600">Manage your recruitment opportunities</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-2">{t('job_vacancies_title')}</h1>
+            <p className="text-gray-600">{t('job_vacancies_subtitle')}</p>
           </div>
           <button
             onClick={() => window.location.href = '/vacancies/new'}
@@ -88,7 +90,7 @@ export function Vacancies() {
             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
             </svg>
-            Add New Vacancy
+            {t('add_new_vacancy')}
           </button>
         </div>
 
@@ -110,7 +112,7 @@ export function Vacancies() {
             <div className="flex items-center justify-center py-16">
               <div className="flex items-center space-x-3">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                <p className="text-gray-600 font-medium">Loading vacancies...</p>
+                <p className="text-gray-600 font-medium">{t('loading_vacancies')}</p>
               </div>
             </div>
           ) : vacancies.length === 0 ? (
@@ -120,9 +122,9 @@ export function Vacancies() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2V6"/>
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No vacancies yet</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">{t('no_vacancies_yet')}</h3>
               <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                Start building your recruitment pipeline by creating your first job vacancy.
+                {t('no_vacancies_description')}
               </p>
               <button
                 onClick={() => window.location.href = '/vacancies/new'}
@@ -131,7 +133,7 @@ export function Vacancies() {
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
                 </svg>
-                Create Your First Vacancy
+                {t('create_first_vacancy')}
               </button>
             </div>
           ) : (
@@ -156,13 +158,13 @@ export function Vacancies() {
                               <div className={`w-2 h-2 rounded-full mr-2 ${
                                 vacancy.status === 'active' ? 'bg-green-500' : 'bg-gray-500'
                               }`}></div>
-                              {vacancy.status.charAt(0).toUpperCase() + vacancy.status.slice(1)}
+                              {vacancy.status === 'active' ? t('status_active') : t('status_inactive')}
                             </span>
                             <span className="text-gray-500 text-sm flex items-center">
                               <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3a2 2 0 012-2h4a2 2 0 012 2v4m-6 0V6a2 2 0 012-2h4a2 2 0 012 2v1m-6 0h8m-8 0H6a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V9a2 2 0 00-2-2h-2"/>
                               </svg>
-                              Created {vacancy.createdAt ? formatDate(vacancy.createdAt) : 'Unknown'}
+                              {t('created_at')} {vacancy.createdAt ? formatDate(vacancy.createdAt) : 'Unknown'}
                             </span>
                           </div>
                         </div>
@@ -180,7 +182,7 @@ export function Vacancies() {
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
                             </svg>
-                            Technical Skills Required
+                            {t('technical_skills_required')}
                           </h4>
                           <div className="flex flex-wrap gap-2">
                             {vacancy.requirements.technicalSkills.slice(0, 6).map((skill, skillIndex) => (
@@ -198,7 +200,7 @@ export function Vacancies() {
                             ))}
                             {vacancy.requirements.technicalSkills.length > 6 && (
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                +{vacancy.requirements.technicalSkills.length - 6} more
+                                +{vacancy.requirements.technicalSkills.length - 6} {t('more')}
                               </span>
                             )}
                           </div>
@@ -212,7 +214,7 @@ export function Vacancies() {
                             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H8a2 2 0 01-2-2V8a2 2 0 012-2V6"/>
                             </svg>
-                            Experience Requirements
+                            {t('experience_requirements')}
                           </h4>
                           <div className="flex flex-wrap gap-2">
                             {vacancy.requirements.experience.slice(0, 3).map((exp, expIndex) => (
@@ -220,7 +222,7 @@ export function Vacancies() {
                                 key={expIndex}
                                 className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200"
                               >
-                                {exp.domain} ({exp.minimumYears}+ years)
+                                {exp.domain} ({exp.minimumYears}+ {t('years')})
                                 {exp.preferred && (
                                   <span className="ml-1 text-blue-600">★</span>
                                 )}
@@ -228,7 +230,7 @@ export function Vacancies() {
                             ))}
                             {vacancy.requirements.experience.length > 3 && (
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
-                                +{vacancy.requirements.experience.length - 3} more
+                                +{vacancy.requirements.experience.length - 3} {t('more')}
                               </span>
                             )}
                           </div>
@@ -241,17 +243,17 @@ export function Vacancies() {
                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                           </svg>
-                          Evaluation Criteria
+                          {t('evaluation_criteria')}
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                            Technical: {vacancy.evaluationWeights.technicalSkills}%
+                            {t('technical')}: {vacancy.evaluationWeights.technicalSkills}%
                           </span>
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                            Communication: {vacancy.evaluationWeights.communication}%
+                            {t('communication')}: {vacancy.evaluationWeights.communication}%
                           </span>
                           <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-                            Problem Solving: {vacancy.evaluationWeights.problemSolving}%
+                            {t('problem_solving')}: {vacancy.evaluationWeights.problemSolving}%
                           </span>
                         </div>
                       </div>
@@ -266,7 +268,7 @@ export function Vacancies() {
                         <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                         </svg>
-                        Edit
+                        {t('edit')}
                       </button>
                       <button 
                         onClick={() => handleDeleteVacancy(vacancy.id, vacancy.title)}
@@ -276,14 +278,14 @@ export function Vacancies() {
                         {deletingIds.has(vacancy.id) ? (
                           <>
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-red-600 mr-2"></div>
-                            Deleting...
+                            {t('deleting')}
                           </>
                         ) : (
                           <>
                             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                             </svg>
-                            Delete
+                            {t('delete')}
                           </>
                         )}
                       </button>

@@ -10,6 +10,10 @@ export const config = {
     baseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
     model: process.env.OLLAMA_MODEL || 'gemma3n:latest',
   },
+  perplexity: {
+    apiKey: process.env.PERPLEXITY_API_KEY || '',
+    model: process.env.PERPLEXITY_MODEL || 'sonar-pro',
+  },
   database: {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '5432', 10),

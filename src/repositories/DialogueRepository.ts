@@ -14,7 +14,7 @@ export class DialogueRepository extends BaseRepository<Dialogue, CreateDialogueD
   async findByCandidateId(candidateId: number): Promise<Dialogue[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE candidate_id = $1 ORDER BY created_at ASC`, [candidateId]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find dialogues by candidate ID`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -30,7 +30,7 @@ export class DialogueRepository extends BaseRepository<Dialogue, CreateDialogueD
   async findByVacancyId(vacancyId: number): Promise<Dialogue[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE vacancy_id = $1 ORDER BY created_at ASC`, [vacancyId]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find dialogues by vacancy ID`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -49,7 +49,7 @@ export class DialogueRepository extends BaseRepository<Dialogue, CreateDialogueD
         `SELECT * FROM ${this.tableName} WHERE candidate_id = $1 AND vacancy_id = $2 ORDER BY created_at ASC`,
         [candidateId, vacancyId]
       );
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find dialogues by candidate and vacancy`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -66,7 +66,7 @@ export class DialogueRepository extends BaseRepository<Dialogue, CreateDialogueD
   async findByMessageType(messageType: 'text' | 'audio' | 'system'): Promise<Dialogue[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE message_type = $1 ORDER BY created_at ASC`, [messageType]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find dialogues by message type`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -82,7 +82,7 @@ export class DialogueRepository extends BaseRepository<Dialogue, CreateDialogueD
   async findBySender(sender: 'candidate' | 'bot'): Promise<Dialogue[]> {
     try {
       const result = await db.query(`SELECT * FROM ${this.tableName} WHERE sender = $1 ORDER BY created_at ASC`, [sender]);
-      return result.rows;
+      return result.rows.map(row => this.convertKeysToCamelCase(row));
     } catch (error) {
       logger.error(`Failed to find dialogues by sender`, {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -101,7 +101,7 @@ export class DialogueRepository extends BaseRepository<Dialogue, CreateDialogueD
         `SELECT * FROM ${this.tableName} WHERE candidate_id = $1 AND vacancy_id = $2 ORDER BY created_at DESC LIMIT $3`,
         [candidateId, vacancyId, limit]
       );
-      return result.rows.reverse(); // Return in chronological order
+      return result.rows.map(row => this.convertKeysToCamelCase(row)).reverse(); // Return in chronological order
     } catch (error) {
       logger.error(`Failed to get conversation history`, {
         error: error instanceof Error ? error.message : 'Unknown error',

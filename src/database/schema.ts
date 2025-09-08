@@ -31,6 +31,10 @@ export class DatabaseSchema {
           first_name VARCHAR(255),
           last_name VARCHAR(255),
           username VARCHAR(255),
+          cv_file_path VARCHAR(500),
+          cv_file_name VARCHAR(255),
+          cv_file_size INTEGER,
+          cv_uploaded_at TIMESTAMP,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
@@ -42,10 +46,13 @@ export class DatabaseSchema {
           id SERIAL PRIMARY KEY,
           candidate_id INTEGER REFERENCES candidates(id) ON DELETE CASCADE,
           vacancy_id INTEGER REFERENCES vacancies(id) ON DELETE CASCADE,
-          message_type VARCHAR(50) NOT NULL CHECK (message_type IN ('text', 'audio', 'system')),
+          message_type VARCHAR(50) NOT NULL CHECK (message_type IN ('text', 'audio', 'system', 'document')),
           content TEXT NOT NULL,
           audio_file_path VARCHAR(500),
           transcription TEXT,
+          document_file_path VARCHAR(500),
+          document_file_name VARCHAR(255),
+          document_file_size INTEGER,
           sender VARCHAR(50) NOT NULL CHECK (sender IN ('candidate', 'bot')),
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -68,6 +75,35 @@ export class DatabaseSchema {
           recommendation VARCHAR(50) CHECK (recommendation IN ('proceed', 'reject', 'clarify')),
           feedback TEXT,
           analysis_data JSONB,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(candidate_id, vacancy_id)
+        );
+      `);
+
+      // Create interview_results table - 🎯 Результаты интервью
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS interview_results (
+          id SERIAL PRIMARY KEY,
+          dialogue_id INTEGER REFERENCES dialogues(id) ON DELETE CASCADE,
+          candidate_id INTEGER REFERENCES candidates(id) ON DELETE CASCADE,
+          vacancy_id INTEGER REFERENCES vacancies(id) ON DELETE CASCADE,
+          evaluation_id INTEGER REFERENCES evaluations(id) ON DELETE SET NULL,
+          interview_status VARCHAR(50) NOT NULL CHECK (interview_status IN ('completed', 'in_progress', 'cancelled')),
+          total_questions INTEGER DEFAULT 0,
+          total_answers INTEGER DEFAULT 0,
+          interview_duration_minutes INTEGER,
+          completion_percentage INTEGER CHECK (completion_percentage >= 0 AND completion_percentage <= 100),
+          final_feedback TEXT,
+          interviewer_notes TEXT,
+          candidate_satisfaction_rating INTEGER CHECK (candidate_satisfaction_rating >= 1 AND candidate_satisfaction_rating <= 5),
+          technical_assessment_score INTEGER CHECK (technical_assessment_score >= 0 AND technical_assessment_score <= 100),
+          soft_skills_assessment_score INTEGER CHECK (soft_skills_assessment_score >= 0 AND soft_skills_assessment_score <= 100),
+          overall_impression TEXT,
+          next_steps TEXT,
+          follow_up_required BOOLEAN DEFAULT false,
+          follow_up_date TIMESTAMP,
+          result_data JSONB,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(candidate_id, vacancy_id)
@@ -121,6 +157,24 @@ export class DatabaseSchema {
       await db.query(`
         CREATE INDEX IF NOT EXISTS idx_evaluations_recommendation
         ON evaluations(recommendation);
+      `);
+
+      // Index on interview_results for candidate and vacancy queries
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_interview_results_candidate_vacancy
+        ON interview_results(candidate_id, vacancy_id);
+      `);
+
+      // Index on interview_results status for filtering
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_interview_results_status
+        ON interview_results(interview_status);
+      `);
+
+      // Index on interview_results created_at for chronological ordering
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_interview_results_created_at
+        ON interview_results(created_at);
       `);
 
       // Index on vacancies status for active vacancy queries

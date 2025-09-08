@@ -37,6 +37,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.21.2",
+    "i18next": "^25.5.2",
     "node-fetch": "^3.3.2",
     "node-telegram-bot-api": "^0.66.0",
     "pg": "^8.16.3",
