@@ -10,6 +10,7 @@ import evaluationRoutes from './routes/evaluations.js';
 import dashboardRoutes from './routes/dashboard.js';
 import promptSettingsRoutes from './routes/prompt-settings.js';
 import settingsRoutes from './routes/settings.js';
+import interviewResultsRoutes from './routes/interview-results.js';
 
 class ApiServer {
   private app: express.Application;
@@ -65,6 +66,7 @@ class ApiServer {
     this.app.use('/api/dashboard', dashboardRoutes);
     this.app.use('/api/prompt-settings', promptSettingsRoutes);
     this.app.use('/api/settings', settingsRoutes);
+    this.app.use('/api/interview-results', interviewResultsRoutes);
 
     // File serving endpoint for CV files
     this.app.get('/api/files/cv/:candidateId/:filename', (req, res) => {

@@ -7,6 +7,7 @@ import {
   getCvFileUrl
 } from '../services/candidatesService'
 import { DialogueHistoryModal } from '../components/DialogueHistoryModal'
+import { InterviewResultsModal } from '../components/InterviewResultsModal'
 import { useI18n } from '../hooks/useI18n'
 
 export function Candidates() {
@@ -29,6 +30,10 @@ export function Candidates() {
   const [selectedVacancyId, setSelectedVacancyId] = useState<number | undefined>(undefined)
   const [selectedVacancyTitle, setSelectedVacancyTitle] = useState<string | undefined>(undefined)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  
+  // Interview Results Modal state
+  const [isInterviewResultsModalOpen, setIsInterviewResultsModalOpen] = useState(false)
+  const [selectedCandidateForResults, setSelectedCandidateForResults] = useState<Candidate | null>(null)
 
   const loadCandidates = async (page: number = 1) => {
     setLoading(true)
@@ -88,6 +93,17 @@ export function Candidates() {
     if (cvUrl) {
       window.open(cvUrl, '_blank')
     }
+  }
+
+  const handleInterviewResultsClick = (candidate: Candidate, event: Event) => {
+    event.stopPropagation() // Prevent row click
+    setSelectedCandidateForResults(candidate)
+    setIsInterviewResultsModalOpen(true)
+  }
+
+  const handleCloseInterviewResultsModal = () => {
+    setIsInterviewResultsModalOpen(false)
+    setSelectedCandidateForResults(null)
   }
 
   const formatDate = (dateString: string) => {
@@ -171,6 +187,9 @@ export function Candidates() {
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                       CV/Resume
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
+                      Результаты интервью
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-secondary-500 uppercase tracking-wider">
                       {t('registered')}
@@ -266,6 +285,18 @@ export function Candidates() {
                           <span className="text-sm text-secondary-500 italic">{t('no_cv_uploaded')}</span>
                         )}
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={(e) => handleInterviewResultsClick(candidate, e)}
+                          className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-4 font-medium rounded-md text-purple-700 bg-purple-100 hover:bg-purple-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
+                          title="Просмотр результатов интервью"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                          </svg>
+                          Результаты
+                        </button>
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-secondary-500">
                         {formatDate(candidate.createdAt)}
                       </td>
@@ -335,6 +366,16 @@ export function Candidates() {
           vacancyTitle={selectedVacancyTitle}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
+        />
+      )}
+
+      {/* Interview Results Modal */}
+      {selectedCandidateForResults && (
+        <InterviewResultsModal
+          candidateId={selectedCandidateForResults.id}
+          candidateName={formatCandidateName(selectedCandidateForResults)}
+          isOpen={isInterviewResultsModalOpen}
+          onClose={handleCloseInterviewResultsModal}
         />
       )}
     </div>
