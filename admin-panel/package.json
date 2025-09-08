@@ -2,6 +2,10 @@
   "name": "ai-hr-bot-admin-panel",
   "version": "1.0.0",
   "description": "Admin panel for AI HR Bot",
+  "author": {
+    "name": "Alexander Gerasimov",
+    "url": "https://agrsmv.ru"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
