@@ -28,10 +28,10 @@ router.get('/stats', async (req, res) => {
     );
     const totalCandidates = parseInt(totalCandidatesResult.rows[0].count, 10);
 
-    // Get interviews today (evaluations created today)
+    // Get interviews today (unique candidate-vacancy dialogue sessions started today)
     const interviewsTodayResult = await db.query(`
-      SELECT COUNT(*) as count 
-      FROM evaluations 
+      SELECT COUNT(DISTINCT (candidate_id, vacancy_id)) as count 
+      FROM dialogues 
       WHERE DATE(created_at) = CURRENT_DATE
     `);
     const interviewsToday = parseInt(interviewsTodayResult.rows[0].count, 10);

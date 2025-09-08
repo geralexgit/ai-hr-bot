@@ -709,9 +709,9 @@ ${data.first_question || 'Расскажите подробнее о своем 
 
             // Send interview results summary
             const resultsSummary = await this.interviewResultsService.generateResultsSummary(chatId, vacancyId);
-            await this.bot.sendMessage(chatId, resultsSummary, {
-                parse_mode: 'Markdown'
-            });
+            // await this.bot.sendMessage(chatId, resultsSummary, {
+            //     parse_mode: 'Markdown'
+            // });
 
             // Log successful evaluation
             logger.info('Evaluation completed and sent to candidate', {

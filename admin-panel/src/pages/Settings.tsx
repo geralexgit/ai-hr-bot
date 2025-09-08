@@ -653,11 +653,13 @@ export function Settings() {
                         {t('model')}
                       </label>
                       <select
-                        value={llmSettings.find(s => s.key === 'perplexity_model')?.value || 'llama-3.1-sonar-small-128k-online'}
+                        value={llmSettings.find(s => s.key === 'perplexity_model')?.value || 'sonar-pro'}
                         onChange={(e) => handleLlmSettingChange('perplexity_model', (e.target as HTMLSelectElement).value)}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                         disabled={llmLoading}
                       >
+                        <option value="sonar-pro">Sonar Pro (Recommended)</option>
+                        <option value="sonar">Sonar</option>
                         <option value="llama-3.1-sonar-small-128k-online">Llama 3.1 Sonar Small 128K Online</option>
                         <option value="llama-3.1-sonar-large-128k-online">Llama 3.1 Sonar Large 128K Online</option>
                         <option value="llama-3.1-sonar-huge-128k-online">Llama 3.1 Sonar Huge 128K Online</option>

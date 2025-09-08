@@ -341,7 +341,8 @@ export class InterviewResultsService {
       let summary = '🎯 **Результаты интервью**\n\n';
       
       if (candidate) {
-        summary += `👤 **Кандидат:** ${candidate.firstName} ${candidate.lastName || ''}`.trim() + '\n';
+        const candidateName = [candidate.firstName, candidate.lastName].filter(Boolean).join(' ');
+        summary += `👤 **Кандидат:** ${candidateName || 'Не указано'}\n`;
       }
       
       if (vacancy) {

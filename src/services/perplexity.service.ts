@@ -30,7 +30,7 @@ export class PerplexityService {
   private model: string;
   private baseUrl = 'https://api.perplexity.ai';
 
-  constructor(apiKey: string, model: string = 'llama-3.1-sonar-small-128k-online') {
+  constructor(apiKey: string, model: string = 'sonar-pro') {
     this.apiKey = apiKey;
     this.model = model;
   }
@@ -54,15 +54,7 @@ export class PerplexityService {
               role: 'user',
               content: prompt
             }
-          ],
-          max_tokens: 4000,
-          temperature: 0.1,
-          top_p: 0.9,
-          return_citations: false,
-          return_images: false,
-          return_related_questions: false,
-          search_domain_filter: [],
-          search_recency_filter: 'month'
+          ]
         })
       });
 

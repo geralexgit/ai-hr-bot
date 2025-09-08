@@ -53,7 +53,7 @@ export class LLMService {
         this.systemSettingsRepository.getValue('ollama_base_url', 'http://localhost:11434'),
         this.systemSettingsRepository.getValue('ollama_model', 'gemma3n:latest'),
         this.systemSettingsRepository.getValue('perplexity_api_key', ''),
-        this.systemSettingsRepository.getValue('perplexity_model', 'llama-3.1-sonar-small-128k-online')
+        this.systemSettingsRepository.getValue('perplexity_model', 'sonar-pro')
       ]);
 
       return {
@@ -71,7 +71,7 @@ export class LLMService {
         ollamaBaseUrl: 'http://localhost:11434',
         ollamaModel: 'gemma3n:latest',
         perplexityApiKey: '',
-        perplexityModel: 'llama-3.1-sonar-small-128k-online'
+        perplexityModel: 'sonar-pro'
       };
     }
   }

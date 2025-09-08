@@ -116,7 +116,7 @@ export function Dashboard() {
           <p className="text-3xl font-bold text-success-600">{stats.totalCandidates}</p>
         </div>
         <div className="card">
-          <h3 className="text-lg font-semibold text-secondary-900 mb-2">{t('interviews_today')}</h3>
+          <h3 className="text-lg font-semibold text-secondary-900 mb-2">{t('active_interviews_today')}</h3>
           <p className="text-3xl font-bold text-warning-600">{stats.interviewsToday}</p>
         </div>
         <div className="card">
@@ -179,7 +179,7 @@ export function Dashboard() {
         </div>
 
         {/* Average Scores */}
-        <div className="card lg:col-span-2">
+        {/* <div className="card lg:col-span-2">
           <h3 className="text-xl font-semibold text-secondary-900 mb-4">{t('average_scores')}</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
@@ -199,7 +199,7 @@ export function Dashboard() {
               <p className="text-sm text-secondary-600">{t('problem_solving')}</p>
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
     </div>
   )
