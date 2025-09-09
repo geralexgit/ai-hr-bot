@@ -186,43 +186,126 @@ CORS_ORIGIN_PROD=https://your-admin-panel-domain.com
 For Docker deployment, adjust these settings in your `.env` file:
 
 ```env
-# Use Docker internal network
+# Database - use Docker internal network
 DB_HOST=database
+DB_PORT=5432
+DB_SSL=false
+
+# Ollama configuration for Docker
+# For Docker Desktop (Windows/Mac):
 OLLAMA_BASE_URL=http://host.docker.internal:11434
+# For Linux Docker:
+# OLLAMA_BASE_URL=http://172.17.0.1:11434
+
+# Application settings
 NODE_ENV=production
+LOG_LEVEL=info
+
+# Bot-specific settings (required for bot container)
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# Optional: Perplexity API as backup
+PERPLEXITY_API_KEY=your_perplexity_api_key_here
+PERPLEXITY_MODEL=sonar-pro
 ```
+
+### Bot-Specific Docker Notes
+
+The bot service (`docker-compose.yml` → `bot` service) has these characteristics:
+- **Dedicated Container**: Uses `Dockerfile.bot` for optimized bot-only deployment
+- **Health Checks**: Monitors bot process health every 60 seconds
+- **Restart Policy**: Automatically restarts on failure with `unless-stopped`
+- **Resource Isolation**: Separate logs and uploads volumes from API server
+- **Database Dependency**: Waits for database to be healthy before starting
 
 ## Usage
 
 ### Docker Usage
+
+#### All Services
 ```bash
 # Start all services
 docker-compose up -d
 
-# View logs
+# View logs from all services
 docker-compose logs -f
 
-# Stop services
+# Stop all services
 docker-compose down
 
 # Restart a specific service
 docker-compose restart backend
 ```
 
-### Local Development
+#### Bot-Specific Docker Commands
 ```bash
-# Development mode with hot reload
+# Start only the bot service (requires database)
+docker-compose up -d database bot
+
+# View bot logs in real-time
+docker-compose logs -f bot
+
+# Restart only the bot
+docker-compose restart bot
+
+# Check bot health and status
+docker-compose ps bot
+
+# Execute commands in bot container
+docker-compose exec bot node -e "console.log('Bot container is running')"
+
+# Scale bot instances (if needed)
+docker-compose up -d --scale bot=2
+```
+
+#### Bot Troubleshooting
+```bash
+# Check bot container status
+docker-compose ps bot
+
+# View recent bot logs
+docker-compose logs --tail=50 bot
+
+# Debug bot connectivity
+docker-compose exec bot curl -f http://database:5432 || echo "Database not accessible"
+
+# Restart bot with fresh container
+docker-compose stop bot
+docker-compose rm -f bot
+docker-compose up -d bot
+```
+
+### Local Development
+
+#### Development Mode with Hot Reload
+```bash
+# Start all services together
 npm run dev
 
 # Build and start production
 npm run build
 npm start
-
-# Start specific services
-npm run watch:bot    # Bot service only
-npm run watch:server # API server only
-npm run watch:ui     # Admin panel only
 ```
+
+#### Start Specific Services
+
+**Telegram Bot Only:**
+```bash
+npm run watch:bot
+```
+This command starts only the Telegram bot service with hot reload using nodemon. The bot will automatically restart when you make changes to the source code. This is ideal when you're developing bot-specific features and don't need the API server or admin panel running.
+
+**API Server Only:**
+```bash
+npm run watch:server
+```
+Starts only the Express API server that handles admin panel requests and provides REST endpoints.
+
+**Admin Panel Only:**
+```bash
+npm run watch:ui
+```
+Starts only the frontend admin panel in development mode with hot reload.
 
 ### Admin Panel Development
 ```bash
@@ -235,6 +318,106 @@ npm run dev
 
 # Build admin panel for production
 npm run build
+```
+
+### Bot Development & Deployment
+
+#### Bot-Only Development
+When working specifically on bot features, you can run just the bot service:
+
+```bash
+# Start only the Telegram bot with hot reload
+npm run watch:bot
+```
+
+This is useful when:
+- Developing conversation handlers and bot logic
+- Testing bot responses and interactions
+- Working on message processing and analysis features
+- You don't need the admin panel or API server running
+
+#### Bot Deployment Options
+
+**Development Environment:**
+```bash
+# For development with automatic restarts
+npm run watch:bot
+
+# For one-time development run
+npm run dev  # Starts both bot and API server
+```
+
+**Production Environment:**
+```bash
+# Build the application first
+npm run build
+
+# Start the bot in production
+npm start  # This runs the compiled bot from dist/app.js
+
+# Or use PM2 for process management
+pm2 start dist/app.js --name "ai-hr-bot"
+```
+
+**Docker Deployment:**
+
+*Full System (Recommended):*
+```bash
+# Deploy all services including bot, API server, database, and admin panel
+docker-compose up -d
+
+# Check bot status
+docker-compose logs -f bot
+
+# Restart only the bot service
+docker-compose restart bot
+```
+
+*Bot-Only Container:*
+```bash
+# Build and run only the Telegram bot service
+docker build -f Dockerfile.bot -t ai-hr-bot:bot .
+docker run -d --name ai-hr-bot-telegram --env-file .env ai-hr-bot:bot
+
+# View bot logs
+docker logs -f ai-hr-bot-telegram
+
+# Stop/start bot container
+docker stop ai-hr-bot-telegram
+docker start ai-hr-bot-telegram
+```
+
+*Selective Service Deployment:*
+```bash
+# Run only database and bot (without API server and admin panel)
+docker-compose up -d database bot
+
+# Run everything except bot (for testing API/admin panel)
+docker-compose up -d database backend frontend
+```
+
+#### Bot Configuration
+
+Make sure your `.env` file contains the required bot configuration:
+
+```env
+# Required for bot operation
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# Database connection (required for candidate data)
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=hr_bot
+DB_USER=hr_user
+DB_PASSWORD=your_secure_password_here
+
+# AI/LLM Configuration (required for analysis)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=gemma3n:latest
+
+# Optional: Alternative AI providers
+PERPLEXITY_API_KEY=your_perplexity_api_key_here
+PERPLEXITY_MODEL=sonar-pro
 ```
 
 ### Bot Commands
@@ -312,14 +495,14 @@ ai-hr-bot/
 ### Available Scripts
 
 #### Backend Scripts
-- `npm run dev` - Start development server with hot reload
+- `npm run dev` - Start development server with hot reload (both bot and API server)
 - `npm run build` - Build TypeScript to JavaScript
-- `npm run start` - Start production server
+- `npm run start` - Start production server (bot only)
 - `npm run clean` - Clean build directory
 - `npm run lint` - Run ESLint
 - `npm run format` - Format code with Prettier
-- `npm run watch:bot` - Watch bot service only
-- `npm run watch:server` - Watch API server only
+- `npm run watch:bot` - **Watch bot service only with hot reload**
+- `npm run watch:server` - Watch API server only with hot reload
 
 #### Frontend Scripts
 - `npm run build:ui` - Build admin panel
@@ -331,6 +514,17 @@ ai-hr-bot/
 - `./docker-start.sh` - Start all services with Docker
 - `./docker-start.sh --logs` - Start services and show logs
 - `./setup-database.sh` - Set up local PostgreSQL database
+
+#### Bot Development Scripts
+- `npm run watch:bot` - **Start bot with hot reload (recommended for bot development)**
+- `npm run dev` - Start both bot and API server with hot reload
+- `npm run build && npm start` - Build and run bot in production mode
+
+#### Docker Bot Commands (Quick Reference)
+- `docker-compose up -d bot` - Start bot service only (with database)
+- `docker-compose logs -f bot` - View bot logs in real-time
+- `docker-compose restart bot` - Restart bot service
+- `./docker-start.sh` - **Start all services with automated setup**
 
 ### Testing
 
@@ -719,11 +913,18 @@ module.exports = {
       instances: 1,
       env: {
         NODE_ENV: 'production'
-      }
+      },
+      // Bot-specific configuration
+      restart_delay: 5000,
+      max_restarts: 10,
+      min_uptime: '10s'
     }
   ]
 };
 EOF
+
+# For bot-only deployment, you can also use:
+# pm2 start dist/app.js --name "ai-hr-bot" --restart-delay=5000
 
 # Start applications
 pm2 start ecosystem.config.js
