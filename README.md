@@ -363,47 +363,511 @@ The project uses:
 
 ## Deployment
 
-### Docker Deployment (Recommended)
+This section provides comprehensive deployment instructions for different environments and scenarios.
 
-1. **Prepare environment:**
+### 🐳 Docker Deployment (Recommended)
+
+Docker deployment is the easiest and most reliable method for production environments.
+
+#### Quick Start
+
+1. **Clone and prepare the environment:**
+```bash
+git clone <repository-url>
+cd ai-hr-bot
+cp env.example .env
+```
+
+2. **Configure environment variables:**
+Edit `.env` file with your production values:
+```env
+# Required: Telegram Bot Token
+TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# Database (Docker internal)
+DB_HOST=database
+DB_NAME=hr_bot
+DB_USER=hr_user
+DB_PASSWORD=your_secure_password_here
+
+# Ollama Configuration
+OLLAMA_BASE_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=gemma3n:latest
+
+# Production settings
+NODE_ENV=production
+LOG_LEVEL=info
+
+# CORS for production
+CORS_ORIGIN_PROD=https://your-domain.com
+```
+
+3. **Deploy with automated script:**
+```bash
+# Use the automated Docker startup script
+./docker-start.sh
+
+# Or start manually
+docker-compose up -d
+```
+
+4. **Verify deployment:**
+```bash
+# Check service status
+docker-compose ps
+
+# View logs
+docker-compose logs -f
+
+# Test endpoints
+curl http://localhost:3000/api/health
+curl http://localhost:3001  # Admin panel
+```
+
+#### Production Environment Setup
+
+For production deployments, consider these additional steps:
+
+1. **SSL/TLS Configuration:**
+```bash
+# Add SSL certificates to nginx.conf in admin-panel/
+# Update CORS_ORIGIN_PROD with your HTTPS domain
+```
+
+2. **Resource Limits:**
+```yaml
+# Add to docker-compose.yml
+services:
+  backend:
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          memory: 1G
+```
+
+3. **Health Checks:**
+```yaml
+# Already configured in docker-compose.yml
+healthcheck:
+  test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+  interval: 30s
+  timeout: 10s
+  retries: 3
+```
+
+#### Docker Commands Reference
+
+```bash
+# Start services
+docker-compose up -d
+
+# Stop services
+docker-compose down
+
+# Restart specific service
+docker-compose restart backend
+
+# View logs
+docker-compose logs -f [service-name]
+
+# Scale services
+docker-compose up -d --scale backend=2
+
+# Update and redeploy
+git pull
+docker-compose build
+docker-compose up -d
+
+# Database backup
+docker-compose exec database pg_dump -U hr_user hr_bot > backup.sql
+
+# Database restore
+docker-compose exec -T database psql -U hr_user hr_bot < backup.sql
+```
+
+### 🖥️ VPS/Server Deployment
+
+For deployment on a VPS or dedicated server:
+
+#### Prerequisites
+
+```bash
+# Install Docker and Docker Compose
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.0/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+# Logout and login again
+```
+
+#### Deployment Steps
+
+1. **Server preparation:**
+```bash
+# Update system
+sudo apt update && sudo apt upgrade -y
+
+# Install required packages
+sudo apt install -y git curl wget nginx certbot python3-certbot-nginx
+
+# Create application directory
+sudo mkdir -p /opt/ai-hr-bot
+sudo chown $USER:$USER /opt/ai-hr-bot
+cd /opt/ai-hr-bot
+```
+
+2. **Clone and configure:**
+```bash
+git clone <repository-url> .
+cp env.example .env
+nano .env  # Edit with production values
+```
+
+3. **Set up reverse proxy (optional):**
+```nginx
+# /etc/nginx/sites-available/ai-hr-bot
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+
+    location /api {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/ai-hr-bot /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Get SSL certificate
+sudo certbot --nginx -d your-domain.com
+```
+
+4. **Deploy and start:**
+```bash
+./docker-start.sh
+```
+
+5. **Set up system service (optional):**
+```bash
+# Create systemd service
+sudo tee /etc/systemd/system/ai-hr-bot.service > /dev/null <<EOF
+[Unit]
+Description=AI HR Bot
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/ai-hr-bot
+ExecStart=/usr/local/bin/docker-compose up -d
+ExecStop=/usr/local/bin/docker-compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl enable ai-hr-bot
+sudo systemctl start ai-hr-bot
+```
+
+### ☁️ Cloud Platform Deployment
+
+#### AWS EC2
+
+1. **Launch EC2 instance:**
+   - Instance type: t3.medium or larger
+   - Security groups: Allow ports 22, 80, 443, 3000, 3001
+   - Storage: At least 20GB
+
+2. **Install Docker and deploy:**
+```bash
+# Connect to instance
+ssh -i your-key.pem ubuntu@your-ec2-ip
+
+# Install Docker
+sudo apt update
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker ubuntu
+
+# Deploy application
+git clone <repository-url>
+cd ai-hr-bot
+cp env.example .env
+# Edit .env with production values
+./docker-start.sh
+```
+
+#### DigitalOcean Droplet
+
+1. **Create droplet:**
+   - Image: Docker on Ubuntu
+   - Size: 2GB RAM minimum
+   - Add SSH keys
+
+2. **Deploy:**
+```bash
+ssh root@your-droplet-ip
+git clone <repository-url>
+cd ai-hr-bot
+cp env.example .env
+# Configure .env
+./docker-start.sh
+```
+
+#### Google Cloud Platform
+
+1. **Create VM instance:**
+```bash
+gcloud compute instances create ai-hr-bot \
+    --zone=us-central1-a \
+    --machine-type=e2-standard-2 \
+    --image-family=ubuntu-2004-lts \
+    --image-project=ubuntu-os-cloud \
+    --boot-disk-size=20GB
+```
+
+2. **Deploy application:**
+```bash
+gcloud compute ssh ai-hr-bot --zone=us-central1-a
+# Follow standard deployment steps
+```
+
+### 🔧 Manual/Traditional Deployment
+
+For deployment without Docker:
+
+#### Prerequisites
+
+```bash
+# Install Node.js 18+
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PostgreSQL
+sudo apt-get install postgresql postgresql-contrib
+
+# Install PM2 for process management
+npm install -g pm2
+```
+
+#### Deployment Steps
+
+1. **Prepare application:**
+```bash
+git clone <repository-url>
+cd ai-hr-bot
+npm install
+npm run build
+
+# Build admin panel
+cd admin-panel
+npm install
+npm run build
+cd ..
+```
+
+2. **Set up database:**
+```bash
+./setup-database.sh
+```
+
+3. **Configure environment:**
 ```bash
 cp env.example .env
 # Edit .env with production values
 ```
 
-2. **Deploy with Docker Compose:**
+4. **Start with PM2:**
 ```bash
-# Start all services in production mode
-NODE_ENV=production docker-compose up -d
+# Create PM2 ecosystem file
+cat > ecosystem.config.js << EOF
+module.exports = {
+  apps: [
+    {
+      name: 'ai-hr-bot-server',
+      script: 'dist/server.js',
+      instances: 2,
+      exec_mode: 'cluster',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 3000
+      }
+    },
+    {
+      name: 'ai-hr-bot-telegram',
+      script: 'dist/app.js',
+      instances: 1,
+      env: {
+        NODE_ENV: 'production'
+      }
+    }
+  ]
+};
+EOF
 
+# Start applications
+pm2 start ecosystem.config.js
+pm2 save
+pm2 startup
+```
+
+5. **Set up web server:**
+```bash
+# Install and configure nginx
+sudo apt install nginx
+# Configure nginx to serve admin panel and proxy API
+# (See VPS deployment section for nginx config)
+```
+
+### 📊 Monitoring and Maintenance
+
+#### Health Monitoring
+
+```bash
 # Check service health
+curl http://localhost:3000/api/health
+
+# Monitor Docker services
 docker-compose ps
+docker stats
+
+# Monitor with PM2
+pm2 status
+pm2 logs
+pm2 monit
 ```
 
-3. **Monitor services:**
+#### Backup Strategies
+
 ```bash
-# View logs
-docker-compose logs -f
+# Database backup
+docker-compose exec database pg_dump -U hr_user hr_bot > backup_$(date +%Y%m%d).sql
 
-# Check specific service
-docker-compose logs backend
+# Full application backup
+tar -czf ai-hr-bot-backup-$(date +%Y%m%d).tar.gz \
+    --exclude=node_modules \
+    --exclude=dist \
+    --exclude=admin-panel/node_modules \
+    --exclude=admin-panel/dist \
+    /opt/ai-hr-bot
 ```
 
-### Manual Deployment
+#### Log Management
 
-1. **Build the project:**
 ```bash
-npm run build
-npm run build:ui
+# Docker logs
+docker-compose logs --tail=100 -f
+
+# Log rotation setup
+sudo tee /etc/logrotate.d/ai-hr-bot > /dev/null <<EOF
+/opt/ai-hr-bot/logs/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    copytruncate
+}
+EOF
 ```
 
-2. **Set production environment variables**
-3. **Start the application:**
+#### Updates and Maintenance
+
 ```bash
-npm start
+# Update application
+git pull
+docker-compose build
+docker-compose up -d
+
+# Database migrations
+npm run migrate
+
+# Security updates
+sudo apt update && sudo apt upgrade -y
+docker system prune -f
 ```
 
-For detailed deployment instructions, see [DOCKER.md](./DOCKER.md).
+### 🚨 Troubleshooting Deployment
+
+#### Common Issues
+
+1. **Port conflicts:**
+```bash
+# Check port usage
+sudo netstat -tlnp | grep :3000
+sudo lsof -i :3000
+
+# Kill conflicting processes
+sudo kill -9 $(sudo lsof -t -i:3000)
+```
+
+2. **Database connection issues:**
+```bash
+# Test database connectivity
+docker-compose exec database psql -U hr_user -d hr_bot -c "SELECT version();"
+
+# Check database logs
+docker-compose logs database
+```
+
+3. **Memory issues:**
+```bash
+# Monitor resource usage
+docker stats
+free -h
+df -h
+
+# Increase swap if needed
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+```
+
+4. **SSL/HTTPS issues:**
+```bash
+# Test SSL certificate
+openssl s_client -connect your-domain.com:443
+
+# Renew Let's Encrypt certificate
+sudo certbot renew --dry-run
+```
+
+#### Performance Optimization
+
+```bash
+# Enable Docker BuildKit
+export DOCKER_BUILDKIT=1
+
+# Optimize Docker images
+docker system prune -a
+
+# Monitor application performance
+pm2 monit  # For PM2 deployments
+docker stats  # For Docker deployments
+```
+
+For additional deployment guidance and platform-specific instructions, see [DOCKER.md](./DOCKER.md).
 
 ## Troubleshooting
 
