@@ -1,28 +1,31 @@
 import TelegramBot from 'node-telegram-bot-api';
 import { config } from './config/environment.js';
 import { logger } from './utils/logger.js';
-import { OllamaService } from './services/ollama.service.js';
+import { LLMService } from './services/llm.service.js';
 import { ConversationService } from './services/conversation.service.js';
 import { BotHandlers } from './bot/handlers.js';
 import { DatabaseInitializer } from './database/init.js';
 
 class TelegramBotApp {
   private bot: TelegramBot;
-  private ollamaService: OllamaService;
+  private llmService: LLMService;
   private conversationService: ConversationService;
   private handlers: BotHandlers;
 
   constructor() {
     this.bot = new TelegramBot(config.telegram.token, { polling: true });
-    this.ollamaService = new OllamaService();
+    this.llmService = new LLMService();
     this.conversationService = new ConversationService();
-    this.handlers = new BotHandlers(this.bot, this.ollamaService, this.conversationService);
+    this.handlers = new BotHandlers(this.bot, this.llmService, this.conversationService);
   }
 
   async start(): Promise<void> {
     try {
       // Initialize database first
       await DatabaseInitializer.initialize();
+
+      // Initialize LLM service
+      await this.llmService.initialize();
 
       // Setup bot handlers
       this.handlers.setupHandlers();
@@ -34,8 +37,7 @@ class TelegramBotApp {
         platform: process.platform,
         arch: process.arch,
         pid: process.pid,
-        ollamaUrl: config.ollama.baseUrl,
-        ollamaModel: config.ollama.model,
+        llmProvider: 'Centralized LLM Service',
         databaseHost: config.database.host,
         databaseName: config.database.name,
       });

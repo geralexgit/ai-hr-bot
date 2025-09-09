@@ -182,7 +182,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /interview-results/candidate/:candidateId - Get interview results for a specific candidate
-router.get('/candidate/:candidateId', async (req, res) => {
+router.get('/candidate/:candidateId', async (req, res): Promise<void> => {
   try {
     const candidateId = parseInt(req.params.candidateId);
     if (isNaN(candidateId)) {
@@ -193,7 +193,8 @@ router.get('/candidate/:candidateId', async (req, res) => {
           message: 'Invalid candidate ID',
         },
       };
-      return res.status(400).json(response);
+      res.status(400).json(response);
+      return;
     }
 
     const candidate = await candidateRepository.findById(candidateId);
@@ -205,7 +206,8 @@ router.get('/candidate/:candidateId', async (req, res) => {
           message: 'Candidate not found',
         },
       };
-      return res.status(404).json(response);
+      res.status(404).json(response);
+      return;
     }
 
     const interviewResults = await interviewResultRepository.findByCandidate(candidateId);
@@ -250,7 +252,7 @@ router.get('/candidate/:candidateId', async (req, res) => {
 });
 
 // GET /interview-results/:id - Get single interview result with detailed information
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res): Promise<void> => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -261,7 +263,8 @@ router.get('/:id', async (req, res) => {
           message: 'Invalid interview result ID',
         },
       };
-      return res.status(400).json(response);
+      res.status(400).json(response);
+      return;
     }
 
     const interviewResult = await interviewResultRepository.findById(id);
@@ -273,7 +276,8 @@ router.get('/:id', async (req, res) => {
           message: 'Interview result not found',
         },
       };
-      return res.status(404).json(response);
+      res.status(404).json(response);
+      return;
     }
 
     // Get related data

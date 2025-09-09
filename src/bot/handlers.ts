@@ -1,5 +1,5 @@
 import TelegramBot, { Message, CallbackQuery } from 'node-telegram-bot-api';
-import { OllamaService } from '../services/ollama.service.js';
+import { LLMService } from '../services/llm.service.js';
 import { ConversationService } from '../services/conversation.service.js';
 import { FileStorageService } from '../services/file-storage.service.js';
 import { EvaluationService } from '../services/evaluation.service.js';
@@ -23,7 +23,7 @@ export class BotHandlers {
 
     constructor(
         private bot: TelegramBot,
-        private ollamaService: OllamaService,
+        private llmService: LLMService,
         private conversationService: ConversationService
     ) {
         // Initialize i18n with Russian as default
@@ -351,7 +351,7 @@ ${i18nService.t('help_commands')}`;
                 file_content: fileContent || '[Содержимое файла не удалось извлечь, но файл был загружен]'
             });
 
-            const rawOutput = await this.ollamaService.generate(prompt);
+            const rawOutput = await this.llmService.generate(prompt);
             let responseText: string;
 
             try {
@@ -514,7 +514,7 @@ ${data.first_question || 'Расскажите подробнее о своем 
         });
 
         try {
-            const rawOutput = await this.ollamaService.generate(prompt);
+            const rawOutput = await this.llmService.generate(prompt);
             let jsonOutput;
 
             try {
@@ -598,7 +598,7 @@ ${data.first_question || 'Расскажите подробнее о своем 
         const stopTyping = this.startTypingIndicator(chatId);
 
         try {
-            const rawOutput = await this.ollamaService.generate(prompt);
+            const rawOutput = await this.llmService.generate(prompt);
             let responseText: string;
 
             try {
