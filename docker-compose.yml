@@ -38,7 +38,7 @@ services:
       DB_NAME: ${DB_NAME:-hr_bot}
       DB_USER: ${DB_USER:-hr_user}
       DB_PASSWORD: ${DB_PASSWORD:-hr_password}
-      DB_SSL: false
+      DB_SSL: "false"
       DB_MAX_CONNECTIONS: 20
       DB_IDLE_TIMEOUT: 30000
       DB_CONNECTION_TIMEOUT: 5000
@@ -92,7 +92,7 @@ services:
       DB_NAME: ${DB_NAME:-hr_bot}
       DB_USER: ${DB_USER:-hr_user}
       DB_PASSWORD: ${DB_PASSWORD:-hr_password}
-      DB_SSL: false
+      DB_SSL: "false"
       DB_MAX_CONNECTIONS: 10
       DB_IDLE_TIMEOUT: 30000
       DB_CONNECTION_TIMEOUT: 5000
