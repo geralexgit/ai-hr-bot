@@ -212,6 +212,7 @@ export function Settings() {
   // LLM Settings state
   const [llmSettings, setLlmSettings] = useState<SystemSetting[]>([])
   const [llmLoading, setLlmLoading] = useState(false)
+  const [savingSettings, setSavingSettings] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState<{ success: boolean; message: string } | null>(null)
 
@@ -316,7 +317,7 @@ export function Settings() {
 
   const handleSaveLlmSettings = async (): Promise<boolean> => {
     try {
-      setLlmLoading(true)
+      setSavingSettings(true)
       const updates = llmSettings.map(setting => ({
         key: setting.key,
         value: setting.value
@@ -336,7 +337,7 @@ export function Settings() {
       setConnectionStatus({ success: false, message: t('failed_to_save_settings') })
       return false
     } finally {
-      setLlmLoading(false)
+      setSavingSettings(false)
     }
   }
 
@@ -602,7 +603,7 @@ export function Settings() {
                       value={llmSettings.find(s => s.key === 'llm_provider')?.value || 'ollama'}
                       onChange={(e) => handleLlmSettingChange('llm_provider', (e.target as HTMLSelectElement).value)}
                       className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      disabled={llmLoading}
+                      disabled={savingSettings}
                     >
                       <option value="ollama">{t('ollama_local')}</option>
                       <option value="perplexity">{t('perplexity_api')}</option>
@@ -626,7 +627,7 @@ export function Settings() {
                         onChange={(e) => handleLlmSettingChange('ollama_base_url', (e.target as HTMLInputElement).value)}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                         placeholder="http://localhost:11434"
-                        disabled={llmLoading}
+                        disabled={savingSettings}
                       />
                     </div>
                     <div>
@@ -639,7 +640,7 @@ export function Settings() {
                         onChange={(e) => handleLlmSettingChange('ollama_model', (e.target as HTMLInputElement).value)}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                         placeholder="gemma3n:latest"
-                        disabled={llmLoading}
+                        disabled={savingSettings}
                       />
                     </div>
                   </div>
@@ -661,7 +662,7 @@ export function Settings() {
                         onChange={(e) => handleLlmSettingChange('perplexity_api_key', (e.target as HTMLInputElement).value)}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                         placeholder={t('enter_perplexity_api_key')}
-                        disabled={llmLoading}
+                        disabled={savingSettings}
                       />
                     </div>
                     <div>
@@ -672,7 +673,7 @@ export function Settings() {
                         value={llmSettings.find(s => s.key === 'perplexity_model')?.value || 'sonar-pro'}
                         onChange={(e) => handleLlmSettingChange('perplexity_model', (e.target as HTMLSelectElement).value)}
                         className="w-full px-3 py-2 border border-secondary-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        disabled={llmLoading}
+                        disabled={savingSettings}
                       >
                         <option value="sonar-pro">Sonar Pro (Recommended)</option>
                         <option value="sonar">Sonar</option>
@@ -689,17 +690,17 @@ export function Settings() {
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={handleTestConnection}
-                  disabled={testingConnection || llmLoading}
+                  disabled={testingConnection || savingSettings}
                   className="px-4 py-2 text-sm font-medium text-primary-600 bg-white border border-primary-300 rounded-md hover:bg-primary-50 disabled:opacity-50"
                 >
                   {testingConnection ? t('testing') : t('test_connection')}
                 </button>
                 <button
                   onClick={handleSaveLlmSettings}
-                  disabled={llmLoading}
+                  disabled={savingSettings}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 disabled:opacity-50"
                 >
-                  {llmLoading ? t('saving') : t('save_settings')}
+                  {savingSettings ? t('saving') : t('save_settings')}
                 </button>
               </div>
             </>
