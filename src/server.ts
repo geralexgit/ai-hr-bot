@@ -26,12 +26,18 @@ class ApiServer {
 
   private setupMiddleware(): void {
     // CORS configuration
-    this.app.use(cors({
-      origin: config.app.nodeEnv === 'production'
-        ? config.cors.originProd
-        : config.cors.originDev,
+    const corsOptions = {
+      origin: config.cors.allowExternalApi 
+        ? true // Allow all origins for external API calls
+        : (config.app.nodeEnv === 'production'
+          ? config.cors.originProd
+          : config.cors.originDev),
       credentials: true,
-    }));
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    };
+    
+    this.app.use(cors(corsOptions));
 
     // Body parsing middleware
     this.app.use(express.json({ limit: '10mb' }));

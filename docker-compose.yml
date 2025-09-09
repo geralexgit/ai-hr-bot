@@ -51,6 +51,7 @@ services:
       # CORS Configuration
       CORS_ORIGIN_DEV: "http://localhost:5173,http://localhost:3001,http://frontend:80"
       CORS_ORIGIN_PROD: ${CORS_ORIGIN_PROD:-"https://your-admin-panel-domain.com"}
+      CORS_ALLOW_EXTERNAL_API: ${CORS_ALLOW_EXTERNAL_API:-"false"}
       
       # Ollama Configuration
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}

@@ -33,6 +33,7 @@ export const config = {
   cors: {
     originDev: process.env.CORS_ORIGIN_DEV ? process.env.CORS_ORIGIN_DEV.split(',') : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3001'],
     originProd: process.env.CORS_ORIGIN_PROD ? process.env.CORS_ORIGIN_PROD.split(',') : ['https://your-admin-panel-domain.com'],
+    allowExternalApi: process.env.CORS_ALLOW_EXTERNAL_API === 'true',
   },
 };
 
