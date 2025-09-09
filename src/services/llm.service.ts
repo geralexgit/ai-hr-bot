@@ -155,8 +155,10 @@ export class LLMService {
         if (!this.ollamaService) {
           return { success: false, error: 'Ollama service not initialized' };
         }
-        await this.ollamaService.generate('Test');
-        return { success: true };
+        const connected = await this.ollamaService.testConnection();
+        return connected ? 
+          { success: true } : 
+          { success: false, error: 'Ollama service is not running or not accessible' };
       } else if (this.currentProvider === 'perplexity') {
         if (!this.perplexityService) {
           return { success: false, error: 'Perplexity service not initialized' };

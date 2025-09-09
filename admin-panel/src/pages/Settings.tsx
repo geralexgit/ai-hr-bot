@@ -314,7 +314,7 @@ export function Settings() {
     ))
   }
 
-  const handleSaveLlmSettings = async () => {
+  const handleSaveLlmSettings = async (): Promise<boolean> => {
     try {
       setLlmLoading(true)
       const updates = llmSettings.map(setting => ({
@@ -326,12 +326,15 @@ export function Settings() {
       if (response.success) {
         setConnectionStatus({ success: true, message: t('llm_settings_saved') })
         setTimeout(() => setConnectionStatus(null), 3000)
+        return true
       } else {
         setConnectionStatus({ success: false, message: response.error?.message || t('failed_to_save_settings') })
+        return false
       }
     } catch (error) {
       console.error('Error saving LLM settings:', error)
       setConnectionStatus({ success: false, message: t('failed_to_save_settings') })
+      return false
     } finally {
       setLlmLoading(false)
     }
@@ -343,7 +346,11 @@ export function Settings() {
       setConnectionStatus(null)
       
       // Save current settings first
-      await handleSaveLlmSettings()
+      const saveResult = await handleSaveLlmSettings()
+      if (!saveResult) {
+        setConnectionStatus({ success: false, message: t('failed_to_save_settings_before_test') })
+        return
+      }
       
       // Test connection
       const response = await testLLMConnection()
@@ -352,17 +359,26 @@ export function Settings() {
           success: response.data.connected, 
           message: response.data.connected ? 
             t('successfully_connected', { provider: response.data.provider }) : 
-            t('connection_failed')
+            (response.error?.message || t('connection_failed'))
         })
       } else {
+        // Handle different error types more gracefully
+        let errorMessage = response.error?.message || t('connection_test_failed')
+        
+        // Check if it's a network error
+        if (response.error?.code === 'NETWORK_ERROR') {
+          errorMessage = t('backend_not_available')
+        }
+        
         setConnectionStatus({ 
           success: false, 
-          message: response.error?.message || t('connection_test_failed') 
+          message: errorMessage
         })
       }
     } catch (error) {
       console.error('Error testing connection:', error)
-      setConnectionStatus({ success: false, message: t('connection_test_failed') })
+      const errorMessage = error instanceof Error ? error.message : t('connection_test_failed')
+      setConnectionStatus({ success: false, message: errorMessage })
     } finally {
       setTestingConnection(false)
     }

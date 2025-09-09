@@ -57,15 +57,39 @@ async function apiRequest<T>(
       ...options,
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        success: false,
+        error: {
+          code: errorData.error?.code || 'HTTP_ERROR',
+          message: errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`,
+        },
+      };
+    }
+
     const data = await response.json();
     return data;
   } catch (error) {
     console.error('API request failed:', error);
+    
+    // Handle different types of network errors
+    let errorMessage = 'Network error occurred';
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch')) {
+        errorMessage = 'Unable to connect to server. Please check if the backend is running.';
+      } else if (error.message.includes('NetworkError')) {
+        errorMessage = 'Network connection failed. Please check your connection.';
+      } else {
+        errorMessage = error.message;
+      }
+    }
+    
     return {
       success: false,
       error: {
         code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Network error occurred',
+        message: errorMessage,
       },
     };
   }

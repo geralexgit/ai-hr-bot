@@ -35,8 +35,42 @@ export class OllamaService {
       
       return data.response;
     } catch (error) {
-      logger.error('Error calling Ollama API', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Handle connection errors specifically
+      if (error instanceof Error && (
+        error.message.includes('ECONNREFUSED') ||
+        error.message.includes('fetch failed') ||
+        error.message.includes('connect ECONNREFUSED')
+      )) {
+        logger.warn('Ollama service is not available', { baseUrl: this.baseUrl, error: errorMessage });
+        throw new Error(`Ollama service is not running or not accessible at ${this.baseUrl}`);
+      }
+      
+      logger.error('Error calling Ollama API', { error: errorMessage, baseUrl: this.baseUrl });
       throw error;
+    }
+  }
+
+  /**
+   * Test if Ollama service is available
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/tags`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(5000)
+      });
+
+      return response.ok;
+    } catch (error) {
+      logger.warn('Ollama connection test failed', { 
+        baseUrl: this.baseUrl, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      });
+      return false;
     }
   }
 }

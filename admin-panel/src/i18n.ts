@@ -115,6 +115,8 @@ const resources = {
       successfully_connected: 'Успешно подключено к {{provider}}',
       connection_failed: 'Соединение не удалось',
       connection_test_failed: 'Тест соединения не удался',
+      failed_to_save_settings_before_test: 'Не удалось сохранить настройки перед тестированием',
+      backend_not_available: 'Бэкенд сервер недоступен. Проверьте, что сервер запущен.',
       
       // Errors
       error_occurred: 'Произошла ошибка',
@@ -368,6 +370,8 @@ const resources = {
       successfully_connected: 'Successfully connected to {{provider}}',
       connection_failed: 'Connection failed',
       connection_test_failed: 'Connection test failed',
+      failed_to_save_settings_before_test: 'Failed to save settings before testing',
+      backend_not_available: 'Backend server is not available. Please check if the server is running.',
       
       // Errors
       error_occurred: 'An error occurred',
