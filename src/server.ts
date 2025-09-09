@@ -25,13 +25,9 @@ class ApiServer {
   }
 
   private setupMiddleware(): void {
-    // CORS configuration
+    // CORS configuration - Allow all origins for all API calls
     const corsOptions = {
-      origin: config.cors.allowExternalApi 
-        ? true // Allow all origins for external API calls
-        : (config.app.nodeEnv === 'production'
-          ? config.cors.originProd
-          : config.cors.originDev),
+      origin: true, // Allow all origins
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
