@@ -255,9 +255,13 @@ export function Settings() {
         setLlmSettings(response.data)
       } else {
         console.error('Failed to load LLM settings:', response.error?.message)
+        // Provide default settings when API call fails
+        setLlmSettings(createDefaultLlmSettings())
       }
     } catch (err) {
       console.error('Error loading LLM settings:', err)
+      // Provide default settings when error occurs
+      setLlmSettings(createDefaultLlmSettings())
     } finally {
       setLlmLoading(false)
     }
@@ -268,6 +272,17 @@ export function Settings() {
       loadLlmSettings()
     }
   }, [activeTab])
+
+  const createDefaultLlmSettings = (): SystemSetting[] => {
+    const now = new Date().toISOString()
+    return [
+      { id: 0, key: 'llm_provider', value: 'ollama', category: 'llm', valueType: 'string' as const, isEncrypted: false, createdAt: now, updatedAt: now },
+      { id: 0, key: 'ollama_base_url', value: 'http://localhost:11434', category: 'llm', valueType: 'string' as const, isEncrypted: false, createdAt: now, updatedAt: now },
+      { id: 0, key: 'ollama_model', value: 'gemma3n:latest', category: 'llm', valueType: 'string' as const, isEncrypted: false, createdAt: now, updatedAt: now },
+      { id: 0, key: 'perplexity_api_key', value: '', category: 'llm', valueType: 'string' as const, isEncrypted: true, createdAt: now, updatedAt: now },
+      { id: 0, key: 'perplexity_model', value: 'sonar-pro', category: 'llm', valueType: 'string' as const, isEncrypted: false, createdAt: now, updatedAt: now }
+    ]
+  }
 
   const handleSavePrompt = async (data: CreatePromptSettingDto | UpdatePromptSettingDto) => {
     try {
