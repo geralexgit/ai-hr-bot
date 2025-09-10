@@ -38,8 +38,7 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Copy any additional files that might be needed at runtime
-COPY --from=builder /app/src/database/schema.sql ./dist/database/ 2>/dev/null || true
+# Note: Database schema is created programmatically via TypeScript, no SQL file needed
 
 # Create directories for logs and uploads if needed
 RUN mkdir -p /app/logs /app/uploads && \

@@ -6,8 +6,6 @@ import {
   getInterviewStatusBadgeColor,
   calculateOverallAssessmentScore
 } from '../services/interviewResultsService'
-import { formatCandidateName } from '../services/candidatesService'
-import { useI18n } from '../hooks/useI18n'
 
 interface InterviewResultsModalProps {
   candidateId: number
@@ -22,7 +20,6 @@ export function InterviewResultsModal({
   isOpen, 
   onClose 
 }: InterviewResultsModalProps) {
-  const { t } = useI18n()
   const [interviewResults, setInterviewResults] = useState<InterviewResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
