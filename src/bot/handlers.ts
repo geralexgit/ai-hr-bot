@@ -30,6 +30,24 @@ export class BotHandlers {
         i18nService.initialize('ru').catch(err => {
             logger.error('Failed to initialize i18n service', { error: err });
         });
+
+        // Add global error handler for the bot
+        this.bot.on('error', (error) => {
+            logger.error('Telegram Bot API error', {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                timestamp: new Date().toISOString()
+            });
+        });
+
+        // Add polling error handler
+        this.bot.on('polling_error', (error) => {
+            logger.error('Telegram Bot polling error', {
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined,
+                timestamp: new Date().toISOString()
+            });
+        });
     }
 
     setupHandlers(): void {
@@ -207,37 +225,90 @@ export class BotHandlers {
             timestamp: new Date().toISOString()
         });
 
-        if (!chatId || !data) {
-            logger.warn('Invalid callback query - missing chatId or data', { 
-                chatId, 
-                userId,
-                data,
-                callbackQueryId: callbackQuery.id
-            });
-            return;
-        }
+        try {
+            if (!chatId || !data) {
+                logger.warn('Invalid callback query - missing chatId or data', { 
+                    chatId, 
+                    userId,
+                    data,
+                    callbackQueryId: callbackQuery.id
+                });
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                    text: 'Invalid request. Please try again.',
+                    show_alert: true
+                });
+                return;
+            }
 
-        // Answer callback query to remove loading state
-        await this.bot.answerCallbackQuery(callbackQuery.id);
-        logger.info('Callback query answered', { chatId, userId, callbackQueryId: callbackQuery.id });
+            // Answer callback query to remove loading state
+            await this.bot.answerCallbackQuery(callbackQuery.id);
+            logger.info('Callback query answered', { chatId, userId, callbackQueryId: callbackQuery.id });
 
-        if (data.startsWith('vacancy_')) {
-            const vacancyId = parseInt(data.replace('vacancy_', ''));
-            logger.info('Processing vacancy selection from callback', { 
-                chatId, 
+            if (data.startsWith('vacancy_')) {
+                const vacancyId = parseInt(data.replace('vacancy_', ''));
+                
+                if (isNaN(vacancyId)) {
+                    logger.warn('Invalid vacancy ID in callback data', { 
+                        chatId, 
+                        userId,
+                        rawData: data,
+                        parsedVacancyId: vacancyId
+                    });
+                    this.bot.sendMessage(chatId, i18nService.t('vacancy_not_found'));
+                    return;
+                }
+
+                logger.info('Processing vacancy selection from callback', { 
+                    chatId, 
+                    userId,
+                    vacancyId,
+                    rawData: data
+                });
+                
+                await this.handleVacancySelection(chatId, vacancyId, callbackQuery.from);
+            } else {
+                logger.warn('Unknown callback query data format', { 
+                    chatId, 
+                    userId,
+                    data,
+                    callbackQueryId: callbackQuery.id
+                });
+                this.bot.sendMessage(chatId, 'Unknown action. Please use /start to see available options.');
+            }
+        } catch (error) {
+            logger.error('Error in callback query handler', {
+                chatId,
                 userId,
-                vacancyId,
-                rawData: data
+                callbackData: data,
+                callbackQueryId: callbackQuery.id,
+                error: error instanceof Error ? error.message : String(error),
+                stack: error instanceof Error ? error.stack : undefined
             });
-            
-            await this.handleVacancySelection(chatId, vacancyId, callbackQuery.from);
-        } else {
-            logger.warn('Unknown callback query data format', { 
-                chatId, 
-                userId,
-                data,
-                callbackQueryId: callbackQuery.id
-            });
+
+            // Try to answer the callback query even if there was an error
+            try {
+                await this.bot.answerCallbackQuery(callbackQuery.id, {
+                    text: 'An error occurred. Please try again.',
+                    show_alert: true
+                });
+            } catch (answerError) {
+                logger.error('Failed to answer callback query after error', {
+                    callbackQueryId: callbackQuery.id,
+                    error: answerError instanceof Error ? answerError.message : String(answerError)
+                });
+            }
+
+            // Send error message to user if we have a valid chatId
+            if (chatId) {
+                try {
+                    this.bot.sendMessage(chatId, i18nService.t('error_vacancy_selection'));
+                } catch (sendError) {
+                    logger.error('Failed to send error message to user', {
+                        chatId,
+                        error: sendError instanceof Error ? sendError.message : String(sendError)
+                    });
+                }
+            }
         }
     }
 
