@@ -32,9 +32,9 @@ A comprehensive AI-powered recruitment platform that combines a Telegram bot wit
 
 | Setup Type | Command | Access URL | Use Case |
 |------------|---------|------------|----------|
-| **Local Development** | `./docker-start.sh` | `http://localhost` | Testing & development |
-| **Custom Domain** | [Domain Setup](#-custom-domain-setup) | `http://your-domain.com` | Production deployment |
-| **HTTPS Production** | [SSL Setup](#sslhttps-setup) | `https://your-domain.com` | Secure production |
+| **Local Development** | `./docker-start.sh` | `http://localhost:8080` | Testing & development |
+| **Custom Domain** | [Domain Setup](#-custom-domain-setup) | `https://your-domain.com` | Production deployment |
+| **Production Example** | See [hr.agrsmv.ru Setup](#production-example-hragrsm-ru) | `https://hr.agrsmv.ru` | Live production instance |
 
 ### Essential Configuration Steps
 
@@ -44,6 +44,15 @@ A comprehensive AI-powered recruitment platform that combines a Telegram bot wit
 4. **Access Admin Panel**: Open your configured URL in browser
 
 💡 **Need help?** See [Custom Domain Setup](#-custom-domain-setup) below or check [CUSTOM_DOMAIN_SETUP.md](./CUSTOM_DOMAIN_SETUP.md)
+
+### Production Example: hr.agrsmv.ru
+
+This system is currently running in production at [https://hr.agrsmv.ru](https://hr.agrsmv.ru) as a live example. The setup demonstrates:
+- Custom domain configuration with SSL/HTTPS
+- Production-ready Docker deployment
+- Telegram bot integration for candidate interviews
+- Admin panel for HR management
+- PostgreSQL database with candidate data persistence
 
 ## Prerequisites
 
@@ -96,11 +105,11 @@ cp env.docker .env
 ```
 
 4. **Access the services:**
-- Admin Panel: http://localhost (port 80, configurable via FRONTEND_PORT)
+- Admin Panel: http://localhost:8080 (configurable via FRONTEND_PORT)
 - API Server: http://localhost:3000 (configurable via API_PORT)
 - Database: localhost:5432
 
-**Note**: The URLs will automatically adjust based on your `APP_DOMAIN` and `APP_PROTOCOL` settings in `.env`.
+**Note**: The URLs will automatically adjust based on your `APP_DOMAIN` and `APP_PROTOCOL` settings in `.env`. Port 8080 is used by default to avoid conflicts with other services on port 80.
 
 ### 🌐 Custom Domain Setup
 
@@ -159,6 +168,15 @@ APP_PROTOCOL=http
 FRONTEND_PORT=8080
 ```
 Access: `http://192.168.1.100:8080`
+
+**Production Domain Example (hr.agrsmv.ru):**
+```env
+APP_DOMAIN=hr.agrsmv.ru
+APP_PROTOCOL=https
+FRONTEND_PORT=443
+CORS_ORIGIN_PROD=https://hr.agrsmv.ru
+```
+Access: `https://hr.agrsmv.ru`
 
 #### What Gets Configured Automatically
 
@@ -527,6 +545,14 @@ npm start  # This runs the compiled bot from dist/app.js
 # Or use PM2 for process management
 pm2 start dist/app.js --name "ai-hr-bot"
 ```
+
+**Current Production Status:**
+The system is currently running in production at `https://hr.agrsmv.ru` with the following configuration:
+- Frontend: Running on port 443 (HTTPS)
+- Backend API: Running on port 3000
+- Database: PostgreSQL on port 5432
+- Bot: Active Telegram bot integration
+- SSL: Configured with valid certificates
 
 **Docker Deployment:**
 
@@ -1241,6 +1267,30 @@ For additional deployment guidance and platform-specific instructions, see [DOCK
 
 ## Troubleshooting
 
+### Recent Fixes and Known Issues
+
+#### Frontend Container Restarting (RESOLVED)
+**Issue**: Frontend container was restarting with exit code 1 due to nginx configuration error.
+
+**Root Cause**: Invalid `gzip_proxied` directive in `nginx.conf`:
+```nginx
+# BROKEN (old):
+gzip_proxied expired no-cache no-store private must-revalidate auth;
+
+# FIXED (current):
+gzip_proxied any;
+```
+
+**Solution Applied**: 
+- Fixed nginx configuration syntax
+- Changed default port from 80 to 8080 to avoid conflicts
+- Updated docker-compose to use port 443 for production HTTPS
+
+#### Port Conflicts
+**Issue**: Port 80 already in use by system services.
+
+**Solution**: Frontend now defaults to port 8080 for development, 443 for production HTTPS.
+
 ### Common Issues
 
 1. **Bot not responding**: Check if your Telegram bot token is correct
@@ -1248,6 +1298,7 @@ For additional deployment guidance and platform-specific instructions, see [DOCK
 3. **Ollama connection errors**: Ensure Ollama is running on the specified URL
 4. **Model not found**: Make sure the specified model is available in Ollama
 5. **Database schema errors**: Run database tests to verify schema integrity
+6. **Frontend not accessible**: Check if port 8080 (or your configured port) is available and not blocked by firewall
 
 ### Database Issues
 

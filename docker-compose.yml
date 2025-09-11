@@ -131,7 +131,7 @@ services:
       # Pass domain configuration to frontend
       - VITE_API_BASE_URL=${APP_PROTOCOL:-http}://${APP_DOMAIN:-localhost}:${API_PORT:-3000}
     ports:
-      - "${FRONTEND_PORT:-8080}:80"
+      - "${FRONTEND_PORT:-443}:80"
     networks:
       - ai-hr-bot-network
     depends_on:
