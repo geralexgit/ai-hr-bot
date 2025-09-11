@@ -28,6 +28,23 @@ A comprehensive AI-powered recruitment platform that combines a Telegram bot wit
 - **Analytics & Reporting**: Recruitment metrics, success rates, and performance insights
 - **Real-time Monitoring**: Live system status and candidate activity tracking
 
+## 🚀 Quick Start Guide
+
+| Setup Type | Command | Access URL | Use Case |
+|------------|---------|------------|----------|
+| **Local Development** | `./docker-start.sh` | `http://localhost` | Testing & development |
+| **Custom Domain** | [Domain Setup](#-custom-domain-setup) | `http://your-domain.com` | Production deployment |
+| **HTTPS Production** | [SSL Setup](#sslhttps-setup) | `https://your-domain.com` | Secure production |
+
+### Essential Configuration Steps
+
+1. **Get Telegram Bot Token**: Message [@BotFather](https://t.me/botfather) on Telegram
+2. **Configure Domain**: Copy `env.docker` to `.env` and set your `APP_DOMAIN` and `APP_PROTOCOL`
+3. **Start Services**: Run `./docker-start.sh`
+4. **Access Admin Panel**: Open your configured URL in browser
+
+💡 **Need help?** See [Custom Domain Setup](#-custom-domain-setup) below or check [CUSTOM_DOMAIN_SETUP.md](./CUSTOM_DOMAIN_SETUP.md)
+
 ## Prerequisites
 
 ### For Local Development
@@ -84,6 +101,134 @@ cp env.docker .env
 - Database: localhost:5432
 
 **Note**: The URLs will automatically adjust based on your `APP_DOMAIN` and `APP_PROTOCOL` settings in `.env`.
+
+### 🌐 Custom Domain Setup
+
+The AI HR Bot supports custom domains and URLs out of the box. Here's how to configure it:
+
+#### Quick Domain Setup
+
+1. **Copy the Docker environment template:**
+   ```bash
+   cp env.docker .env
+   ```
+
+2. **Configure your domain in `.env`:**
+   ```env
+   # Your custom domain or IP address
+   APP_DOMAIN=your-domain.com
+   
+   # Protocol (http for development, https for production)
+   APP_PROTOCOL=https
+   
+   # Required: Your Telegram bot token
+   TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
+   
+   # Optional: Custom ports
+   FRONTEND_PORT=80    # Admin panel port
+   API_PORT=3000       # API server port
+   ```
+
+3. **Start the services:**
+   ```bash
+   ./docker-start.sh
+   ```
+
+#### Domain Setup Examples
+
+**Local Development:**
+```env
+APP_DOMAIN=localhost
+APP_PROTOCOL=http
+FRONTEND_PORT=80
+```
+Access: `http://localhost`
+
+**Production Domain:**
+```env
+APP_DOMAIN=hr-bot.mycompany.com
+APP_PROTOCOL=https
+FRONTEND_PORT=443
+```
+Access: `https://hr-bot.mycompany.com`
+
+**Server IP Address:**
+```env
+APP_DOMAIN=192.168.1.100
+APP_PROTOCOL=http
+FRONTEND_PORT=8080
+```
+Access: `http://192.168.1.100:8080`
+
+#### What Gets Configured Automatically
+
+When you set your domain configuration, the system automatically handles:
+
+- ✅ **CORS Origins**: Frontend ↔ Backend communication
+- ✅ **API Base URLs**: All API endpoints use your domain
+- ✅ **Nginx Configuration**: Accepts requests for your domain
+- ✅ **Service Discovery**: Internal services find each other correctly
+
+#### SSL/HTTPS Setup
+
+For production HTTPS:
+
+1. **Set HTTPS in your `.env`:**
+   ```env
+   APP_PROTOCOL=https
+   FRONTEND_PORT=443
+   ```
+
+2. **Configure SSL certificates** using one of these methods:
+   - **Reverse Proxy**: Use nginx/Apache with SSL certificates
+   - **Cloud Service**: Use Cloudflare, AWS CloudFront, etc.
+   - **Let's Encrypt**: Use certbot for free SSL certificates
+
+3. **Example nginx reverse proxy config:**
+   ```nginx
+   server {
+       listen 443 ssl;
+       server_name your-domain.com;
+       
+       ssl_certificate /path/to/certificate.crt;
+       ssl_certificate_key /path/to/private.key;
+       
+       location / {
+           proxy_pass http://localhost:80;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+       
+       location /api/ {
+           proxy_pass http://localhost:3000/api/;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+
+#### Troubleshooting Domain Setup
+
+**CORS Errors:**
+- Ensure `APP_DOMAIN` matches exactly what you type in the browser
+- Check `APP_PROTOCOL` is correct (http vs https)
+- Restart containers after changing `.env`: `docker-compose restart`
+
+**Can't Access Application:**
+- Check firewall settings for your ports
+- Verify containers are running: `docker-compose ps`
+- Check logs: `docker-compose logs frontend backend`
+
+**API Not Found:**
+- Test API directly: `curl http://your-domain:3000/health`
+- Verify `API_PORT` is accessible from your network
+- Check backend container health: `docker-compose ps backend`
+
+For detailed domain setup instructions, see [CUSTOM_DOMAIN_SETUP.md](./CUSTOM_DOMAIN_SETUP.md).
 
 For detailed Docker configuration, see [DOCKER.md](./DOCKER.md).
 
