@@ -67,10 +67,23 @@ cp env.example .env
 docker-compose up -d
 ```
 
-3. **Access the services:**
-- Admin Panel: http://localhost:3001
-- API Server: http://localhost:3000
+3. **Configure custom URL (optional):**
+```bash
+# Copy the Docker environment template
+cp env.docker .env
+
+# Edit .env to set your custom domain:
+# APP_DOMAIN=your-domain.com (or your IP address)
+# APP_PROTOCOL=http (or https for production)
+# TELEGRAM_BOT_TOKEN=your_bot_token_here
+```
+
+4. **Access the services:**
+- Admin Panel: http://localhost (port 80, configurable via FRONTEND_PORT)
+- API Server: http://localhost:3000 (configurable via API_PORT)
 - Database: localhost:5432
+
+**Note**: The URLs will automatically adjust based on your `APP_DOMAIN` and `APP_PROTOCOL` settings in `.env`.
 
 For detailed Docker configuration, see [DOCKER.md](./DOCKER.md).
 
@@ -191,18 +204,29 @@ DB_HOST=database
 DB_PORT=5432
 DB_SSL=false
 
+# Domain Configuration - IMPORTANT: Change these for your setup
+# Your custom domain or IP address (e.g., your-domain.com or 192.168.1.100)
+APP_DOMAIN=localhost
+# Protocol (http for local, https for production with SSL)
+APP_PROTOCOL=http
+
+# Application settings
+NODE_ENV=production
+LOG_LEVEL=info
+API_PORT=3000
+FRONTEND_PORT=80
+
 # Ollama configuration for Docker
 # For Docker Desktop (Windows/Mac):
 OLLAMA_BASE_URL=http://host.docker.internal:11434
 # For Linux Docker:
 # OLLAMA_BASE_URL=http://172.17.0.1:11434
 
-# Application settings
-NODE_ENV=production
-LOG_LEVEL=info
-
 # Bot-specific settings (required for bot container)
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+
+# CORS will be automatically configured based on APP_DOMAIN and APP_PROTOCOL
+CORS_ORIGIN_PROD=http://localhost
 
 # Optional: Perplexity API as backup
 PERPLEXITY_API_KEY=your_perplexity_api_key_here

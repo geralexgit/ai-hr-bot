@@ -50,7 +50,7 @@ services:
       
       # CORS Configuration
       CORS_ORIGIN_DEV: "http://localhost:5173,http://localhost:3001,http://frontend:80"
-      CORS_ORIGIN_PROD: ${CORS_ORIGIN_PROD:-"https://your-admin-panel-domain.com"}
+      CORS_ORIGIN_PROD: ${CORS_ORIGIN_PROD:-"${APP_PROTOCOL:-http}://${APP_DOMAIN:-localhost}:${FRONTEND_PORT:-80}"}
       CORS_ALLOW_EXTERNAL_API: ${CORS_ALLOW_EXTERNAL_API:-"false"}
       
       # Ollama Configuration
@@ -127,8 +127,11 @@ services:
       dockerfile: Dockerfile
     container_name: ai-hr-bot-frontend
     restart: unless-stopped
+    environment:
+      # Pass domain configuration to frontend
+      - VITE_API_BASE_URL=${APP_PROTOCOL:-http}://${APP_DOMAIN:-localhost}:${API_PORT:-3000}
     ports:
-      - "${FRONTEND_PORT:-3001}:80"
+      - "${FRONTEND_PORT:-80}:80"
     networks:
       - ai-hr-bot-network
     depends_on:

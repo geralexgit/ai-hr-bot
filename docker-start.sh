@@ -183,9 +183,15 @@ show_status() {
     echo
     
     print_info "Service URLs:"
-    echo "• Admin Panel: http://localhost:3001"
-    echo "• API Server: http://localhost:3000"
-    echo "• API Health: http://localhost:3000/health"
+    # Get domain and protocol from environment variables or use defaults
+    DOMAIN=${APP_DOMAIN:-localhost}
+    PROTOCOL=${APP_PROTOCOL:-http}
+    FRONTEND_PORT_VAL=${FRONTEND_PORT:-80}
+    API_PORT_VAL=${API_PORT:-3000}
+    
+    echo "• Admin Panel: ${PROTOCOL}://${DOMAIN}:${FRONTEND_PORT_VAL}"
+    echo "• API Server: ${PROTOCOL}://${DOMAIN}:${API_PORT_VAL}"
+    echo "• API Health: ${PROTOCOL}://${DOMAIN}:${API_PORT_VAL}/health"
     echo
     
     print_info "Useful Commands:"
