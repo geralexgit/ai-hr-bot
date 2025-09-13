@@ -2,95 +2,228 @@
 
 ## Overview
 
-The AI HR Bot system is designed as a microservices architecture that transforms the existing basic Telegram bot into a comprehensive recruitment platform. The system integrates multiple components: a Telegram bot interface, PostgreSQL database, LLM-powered analysis engine, audio processing capabilities, and a Next.js admin panel.
+The AI HR Bot system is designed as a **multi-tenant SaaS platform** with microservices architecture that provides comprehensive recruitment solutions to multiple customers. Each customer operates in a completely isolated environment with their own:
 
-The architecture follows a modular approach where each component has clearly defined responsibilities and communicates through well-defined APIs. This design ensures scalability, maintainability, and the ability to extend functionality in the future.
+- **Individual Dashboard**: Personalized web interface for managing recruitment operations
+- **Custom Telegram Bot Integration**: Personal bot token configuration for branded candidate interactions
+- **Configurable LLM Processing**: Choice of AI providers (OpenAI, Anthropic, Google, Azure) with secure credential management
+- **Complete Data Isolation**: Tenant-specific data storage with row-level security
+- **Subscription Management**: Flexible pricing tiers with usage-based billing
+
+The platform integrates multiple components: tenant-aware Telegram bot handlers, PostgreSQL database with multi-tenant schema, configurable LLM analysis engines, audio processing capabilities, individual user dashboards, authentication/authorization systems, and subscription management.
+
+The architecture follows a modular, tenant-aware approach where each component enforces data isolation and communicates through well-defined, secured APIs. This design ensures scalability, maintainability, security, and the ability to serve multiple customers simultaneously.
 
 ## Architecture
 
-### High-Level Architecture
+### High-Level SaaS Multi-Tenant Architecture
 
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        TG[Telegram Bot Interface]
-        AP[Next.js Admin Panel]
+        TG1[Tenant A Telegram Bot]
+        TG2[Tenant B Telegram Bot]
+        TGN[Tenant N Telegram Bot]
+        UD1[Tenant A Dashboard]
+        UD2[Tenant B Dashboard]
+        UDN[Tenant N Dashboard]
     end
     
-    subgraph "Application Layer"
-        BH[Bot Handlers]
-        VS[Vacancy Service]
-        CS[Candidate Service]
-        AS[Analysis Service]
-        APS[Audio Processing Service]
+    subgraph "API Gateway & Load Balancer"
+        LB[Load Balancer]
+        AG[API Gateway with Tenant Routing]
+        AUTH[Authentication Service]
+        AUTHZ[Authorization Service]
+    end
+    
+    subgraph "Core SaaS Services"
+        TM[Tenant Management Service]
+        UM[User Management Service]
+        SM[Subscription Management Service]
+        BM[Billing Management Service]
+        NS[Notification Service]
+    end
+    
+    subgraph "Tenant-Aware Business Services"
+        BH[Multi-Tenant Bot Handlers]
+        VS[Tenant-Isolated Vacancy Service]
+        CS[Tenant-Isolated Candidate Service]
+        AS[Configurable Analysis Service]
+        APS[Tenant-Aware Audio Service]
+        TBS[Telegram Bot Service Manager]
+        LLMS[LLM Provider Service]
     end
     
     subgraph "Data Layer"
-        DB[(PostgreSQL Database)]
-        FS[File Storage]
+        DB[(Multi-Tenant PostgreSQL)]
+        REDIS[(Redis Cache)]
+        FS[Tenant-Isolated File Storage]
+        ES[Encrypted Secrets Storage]
     end
     
     subgraph "External Services"
-        LLM[LLM Provider - Ollama/Claude/OpenAI]
-        STT[Speech-to-Text API]
+        OPENAI[OpenAI API]
+        CLAUDE[Anthropic Claude API]
+        GOOGLE[Google AI API]
+        AZURE[Azure OpenAI API]
+        STT[Speech-to-Text APIs]
+        STRIPE[Stripe Billing API]
+        EMAIL[Email Service]
     end
     
-    TG --> BH
-    AP --> VS
-    AP --> CS
+    TG1 --> LB
+    TG2 --> LB
+    TGN --> LB
+    UD1 --> LB
+    UD2 --> LB
+    UDN --> LB
+    
+    LB --> AG
+    AG --> AUTH
+    AG --> AUTHZ
+    AG --> BH
+    AG --> VS
+    AG --> CS
+    
+    AUTH --> UM
+    AUTHZ --> TM
+    
+    BH --> TBS
     BH --> VS
     BH --> CS
     BH --> AS
     BH --> APS
-    AS --> LLM
-    APS --> STT
+    
     VS --> DB
     CS --> DB
     AS --> DB
+    TM --> DB
+    UM --> DB
+    SM --> DB
+    
+    AS --> LLMS
+    LLMS --> OPENAI
+    LLMS --> CLAUDE
+    LLMS --> GOOGLE
+    LLMS --> AZURE
+    
+    APS --> STT
     APS --> FS
+    
+    SM --> BM
+    BM --> STRIPE
+    NS --> EMAIL
+    
+    TBS --> ES
+    LLMS --> ES
+    
+    DB --> REDIS
 ```
 
-### Component Architecture
+### Multi-Tenant Component Architecture
 
-The system is organized into distinct layers:
+The SaaS platform is organized into distinct layers with tenant isolation:
 
-1. **Presentation Layer**: Telegram Bot and Admin Panel interfaces
-2. **Business Logic Layer**: Core services handling domain logic
-3. **Data Access Layer**: Database repositories and file storage
-4. **Integration Layer**: External service connectors
+1. **Client Layer**: Multiple tenant-specific Telegram bots and individual user dashboards
+2. **API Gateway Layer**: Load balancing, tenant routing, authentication, and authorization
+3. **SaaS Management Layer**: Tenant management, user management, subscription, and billing services
+4. **Business Logic Layer**: Tenant-aware core services with data isolation
+5. **Data Access Layer**: Multi-tenant database with row-level security and tenant-isolated file storage
+6. **Integration Layer**: Configurable external service connectors (LLM providers, payment systems)
+
+#### Key Architectural Principles
+
+- **Tenant Isolation**: Complete data separation between customers
+- **Configurable Services**: Each tenant can configure their own LLM providers and settings
+- **Scalable Authentication**: JWT-based authentication with tenant context
+- **Secure Credential Management**: Encrypted storage of tenant-specific API keys
+- **Usage Tracking**: Comprehensive billing and analytics per tenant
+- **High Availability**: Load balancing and service redundancy
 
 ## Components and Interfaces
 
-### Database Schema
+### Multi-Tenant Database Schema
 
 ```sql
--- Vacancies table
+-- Tenants table - Core SaaS entity
+CREATE TABLE tenants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    slug VARCHAR(100) UNIQUE NOT NULL,
+    status VARCHAR(50) DEFAULT 'active', -- 'active', 'suspended', 'cancelled'
+    subscription_tier VARCHAR(50) DEFAULT 'starter', -- 'starter', 'professional', 'enterprise'
+    settings JSONB DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users table - SaaS platform users (customers)
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(255),
+    last_name VARCHAR(255),
+    role VARCHAR(50) DEFAULT 'owner', -- 'owner', 'admin', 'viewer'
+    email_verified BOOLEAN DEFAULT FALSE,
+    last_login TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tenant configurations
+CREATE TABLE tenant_configurations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    telegram_bot_token VARCHAR(500),
+    telegram_webhook_url VARCHAR(500),
+    llm_provider VARCHAR(50), -- 'openai', 'claude', 'google', 'azure'
+    llm_model VARCHAR(100),
+    llm_api_key_encrypted TEXT,
+    llm_settings JSONB DEFAULT '{}',
+    speech_to_text_provider VARCHAR(50),
+    speech_to_text_api_key_encrypted TEXT,
+    evaluation_weights JSONB DEFAULT '{"technical_skills": 50, "communication": 30, "problem_solving": 20}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tenant_id)
+);
+
+-- Vacancies table with tenant isolation
 CREATE TABLE vacancies (
-    id SERIAL PRIMARY KEY,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     requirements JSONB NOT NULL,
     evaluation_weights JSONB NOT NULL,
     status VARCHAR(50) DEFAULT 'active',
+    created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Candidates table
+-- Candidates table with tenant isolation
 CREATE TABLE candidates (
-    id SERIAL PRIMARY KEY,
-    telegram_user_id BIGINT UNIQUE NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    telegram_user_id BIGINT NOT NULL,
     first_name VARCHAR(255),
     last_name VARCHAR(255),
     username VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    phone_number VARCHAR(50),
+    email VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tenant_id, telegram_user_id)
 );
 
--- Dialogues table
+-- Dialogues table with tenant isolation
 CREATE TABLE dialogues (
-    id SERIAL PRIMARY KEY,
-    candidate_id INTEGER REFERENCES candidates(id),
-    vacancy_id INTEGER REFERENCES vacancies(id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+    vacancy_id UUID NOT NULL REFERENCES vacancies(id) ON DELETE CASCADE,
     message_type VARCHAR(50) NOT NULL, -- 'text', 'audio', 'system'
     content TEXT,
     audio_file_path VARCHAR(500),
@@ -99,11 +232,12 @@ CREATE TABLE dialogues (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Evaluations table
+-- Evaluations table with tenant isolation
 CREATE TABLE evaluations (
-    id SERIAL PRIMARY KEY,
-    candidate_id INTEGER REFERENCES candidates(id),
-    vacancy_id INTEGER REFERENCES vacancies(id),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    candidate_id UUID NOT NULL REFERENCES candidates(id) ON DELETE CASCADE,
+    vacancy_id UUID NOT NULL REFERENCES vacancies(id) ON DELETE CASCADE,
     overall_score INTEGER,
     technical_score INTEGER,
     communication_score INTEGER,
@@ -114,29 +248,154 @@ CREATE TABLE evaluations (
     recommendation VARCHAR(50), -- 'proceed', 'reject', 'clarify'
     feedback TEXT,
     analysis_data JSONB,
+    llm_provider_used VARCHAR(50),
+    processing_time_ms INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Subscriptions table
+CREATE TABLE subscriptions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    plan_name VARCHAR(100) NOT NULL,
+    status VARCHAR(50) DEFAULT 'active', -- 'active', 'cancelled', 'past_due'
+    current_period_start TIMESTAMP NOT NULL,
+    current_period_end TIMESTAMP NOT NULL,
+    stripe_subscription_id VARCHAR(255),
+    stripe_customer_id VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Usage tracking for billing
+CREATE TABLE usage_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    metric_type VARCHAR(50) NOT NULL, -- 'llm_calls', 'audio_processing', 'storage_mb'
+    metric_value INTEGER NOT NULL,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(tenant_id, metric_type, period_start)
+);
+
+-- Row Level Security Policies
+ALTER TABLE tenants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tenant_configurations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vacancies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE candidates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dialogues ENABLE ROW LEVEL SECURITY;
+ALTER TABLE evaluations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usage_metrics ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies (example for vacancies)
+CREATE POLICY tenant_isolation_policy ON vacancies
+    USING (tenant_id = current_setting('app.current_tenant_id')::UUID);
+
+-- Indexes for performance
+CREATE INDEX idx_users_tenant_id ON users(tenant_id);
+CREATE INDEX idx_vacancies_tenant_id ON vacancies(tenant_id);
+CREATE INDEX idx_candidates_tenant_id ON candidates(tenant_id);
+CREATE INDEX idx_candidates_tenant_telegram ON candidates(tenant_id, telegram_user_id);
+CREATE INDEX idx_dialogues_tenant_id ON dialogues(tenant_id);
+CREATE INDEX idx_dialogues_candidate_vacancy ON dialogues(candidate_id, vacancy_id);
+CREATE INDEX idx_evaluations_tenant_id ON evaluations(tenant_id);
+CREATE INDEX idx_usage_metrics_tenant_period ON usage_metrics(tenant_id, period_start);
 ```
 
-### Core Services
+### SaaS Core Services
 
-#### VacancyService
+#### TenantService
+```typescript
+interface TenantService {
+    createTenant(tenantData: CreateTenantDto): Promise<Tenant>;
+    getTenantById(tenantId: string): Promise<Tenant | null>;
+    getTenantBySlug(slug: string): Promise<Tenant | null>;
+    updateTenant(tenantId: string, updates: UpdateTenantDto): Promise<Tenant>;
+    suspendTenant(tenantId: string): Promise<void>;
+    deleteTenant(tenantId: string): Promise<void>;
+    getTenantConfiguration(tenantId: string): Promise<TenantConfiguration>;
+    updateTenantConfiguration(tenantId: string, config: UpdateTenantConfigDto): Promise<TenantConfiguration>;
+}
+
+interface Tenant {
+    id: string;
+    name: string;
+    slug: string;
+    status: 'active' | 'suspended' | 'cancelled';
+    subscriptionTier: 'starter' | 'professional' | 'enterprise';
+    settings: Record<string, any>;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+interface TenantConfiguration {
+    id: string;
+    tenantId: string;
+    telegramBotToken?: string;
+    telegramWebhookUrl?: string;
+    llmProvider: 'openai' | 'claude' | 'google' | 'azure';
+    llmModel: string;
+    llmApiKeyEncrypted?: string;
+    llmSettings: Record<string, any>;
+    speechToTextProvider: string;
+    speechToTextApiKeyEncrypted?: string;
+    evaluationWeights: EvaluationWeights;
+    createdAt: Date;
+    updatedAt: Date;
+}
+```
+
+#### UserService
+```typescript
+interface UserService {
+    createUser(userData: CreateUserDto): Promise<User>;
+    getUserById(userId: string): Promise<User | null>;
+    getUserByEmail(email: string): Promise<User | null>;
+    getUsersByTenantId(tenantId: string): Promise<User[]>;
+    updateUser(userId: string, updates: UpdateUserDto): Promise<User>;
+    deleteUser(userId: string): Promise<void>;
+    verifyEmail(userId: string, token: string): Promise<boolean>;
+    resetPassword(email: string): Promise<void>;
+    changePassword(userId: string, currentPassword: string, newPassword: string): Promise<void>;
+}
+
+interface User {
+    id: string;
+    tenantId: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    role: 'owner' | 'admin' | 'viewer';
+    emailVerified: boolean;
+    lastLogin?: Date;
+    createdAt: Date;
+    updatedAt: Date;
+}
+```
+
+#### Tenant-Aware VacancyService
 ```typescript
 interface VacancyService {
-    createVacancy(vacancy: CreateVacancyDto): Promise<Vacancy>;
-    getActiveVacancies(): Promise<Vacancy[]>;
-    getVacancyById(id: number): Promise<Vacancy | null>;
-    updateVacancy(id: number, updates: UpdateVacancyDto): Promise<Vacancy>;
-    deactivateVacancy(id: number): Promise<void>;
+    createVacancy(tenantId: string, vacancy: CreateVacancyDto): Promise<Vacancy>;
+    getActiveVacancies(tenantId: string): Promise<Vacancy[]>;
+    getVacancyById(tenantId: string, vacancyId: string): Promise<Vacancy | null>;
+    updateVacancy(tenantId: string, vacancyId: string, updates: UpdateVacancyDto): Promise<Vacancy>;
+    deactivateVacancy(tenantId: string, vacancyId: string): Promise<void>;
+    getVacancyAnalytics(tenantId: string, vacancyId: string): Promise<VacancyAnalytics>;
 }
 
 interface Vacancy {
-    id: number;
+    id: string;
+    tenantId: string;
     title: string;
     description: string;
     requirements: VacancyRequirements;
     evaluationWeights: EvaluationWeights;
     status: 'active' | 'inactive';
+    createdBy: string;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -146,39 +405,109 @@ interface EvaluationWeights {
     communication: number;   // 0-100, default 30
     problemSolving: number;  // 0-100, default 20
 }
+
+interface VacancyAnalytics {
+    totalCandidates: number;
+    averageScore: number;
+    recommendationDistribution: Record<string, number>;
+    topSkillsFound: string[];
+    commonGaps: string[];
+}
 ```
 
-#### CandidateService
+#### Tenant-Aware CandidateService
 ```typescript
 interface CandidateService {
-    createOrUpdateCandidate(telegramUser: TelegramUser): Promise<Candidate>;
-    getCandidateByTelegramId(telegramUserId: number): Promise<Candidate | null>;
-    getCandidateDialogues(candidateId: number, vacancyId?: number): Promise<Dialogue[]>;
-    addDialogue(dialogue: CreateDialogueDto): Promise<Dialogue>;
+    createOrUpdateCandidate(tenantId: string, telegramUser: TelegramUser): Promise<Candidate>;
+    getCandidateByTelegramId(tenantId: string, telegramUserId: number): Promise<Candidate | null>;
+    getCandidatesByTenantId(tenantId: string, page?: number, limit?: number): Promise<PaginatedResult<Candidate>>;
+    getCandidateDialogues(tenantId: string, candidateId: string, vacancyId?: string): Promise<Dialogue[]>;
+    addDialogue(tenantId: string, dialogue: CreateDialogueDto): Promise<Dialogue>;
+    getCandidateAnalytics(tenantId: string, candidateId: string): Promise<CandidateAnalytics>;
 }
 
 interface Candidate {
-    id: number;
+    id: string;
+    tenantId: string;
     telegramUserId: number;
     firstName?: string;
     lastName?: string;
     username?: string;
+    phoneNumber?: string;
+    email?: string;
     createdAt: Date;
+}
+
+interface CandidateAnalytics {
+    totalApplications: number;
+    averageScore: number;
+    bestVacancyMatch: string;
+    skillsProfile: string[];
+    recommendationHistory: string[];
 }
 ```
 
-#### AnalysisService
+#### SubscriptionService
+```typescript
+interface SubscriptionService {
+    createSubscription(tenantId: string, planName: string, stripeCustomerId: string): Promise<Subscription>;
+    getSubscriptionByTenantId(tenantId: string): Promise<Subscription | null>;
+    updateSubscription(tenantId: string, updates: UpdateSubscriptionDto): Promise<Subscription>;
+    cancelSubscription(tenantId: string): Promise<void>;
+    getUsageMetrics(tenantId: string, startDate: Date, endDate: Date): Promise<UsageMetrics[]>;
+    recordUsage(tenantId: string, metricType: string, value: number): Promise<void>;
+    checkUsageLimits(tenantId: string): Promise<UsageLimitStatus>;
+}
+
+interface Subscription {
+    id: string;
+    tenantId: string;
+    planName: string;
+    status: 'active' | 'cancelled' | 'past_due';
+    currentPeriodStart: Date;
+    currentPeriodEnd: Date;
+    stripeSubscriptionId?: string;
+    stripeCustomerId?: string;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+interface UsageMetrics {
+    id: string;
+    tenantId: string;
+    metricType: 'llm_calls' | 'audio_processing' | 'storage_mb';
+    metricValue: number;
+    periodStart: Date;
+    periodEnd: Date;
+    createdAt: Date;
+}
+
+interface UsageLimitStatus {
+    llmCallsUsed: number;
+    llmCallsLimit: number;
+    audioProcessingUsed: number;
+    audioProcessingLimit: number;
+    storageUsedMB: number;
+    storageLimitMB: number;
+    isOverLimit: boolean;
+    warningThresholdReached: boolean;
+}
+```
+
+#### Tenant-Aware AnalysisService
 ```typescript
 interface AnalysisService {
-    analyzeCandidate(candidateId: number, vacancyId: number): Promise<Evaluation>;
-    generateFeedback(evaluation: Evaluation): Promise<string>;
-    extractSkillsFromText(text: string): Promise<string[]>;
+    analyzeCandidate(tenantId: string, candidateId: string, vacancyId: string): Promise<Evaluation>;
+    generateFeedback(tenantId: string, evaluation: Evaluation): Promise<string>;
+    extractSkillsFromText(tenantId: string, text: string): Promise<string[]>;
+    reanalyzeWithUpdatedCriteria(tenantId: string, evaluationId: string): Promise<Evaluation>;
 }
 
 interface Evaluation {
-    id: number;
-    candidateId: number;
-    vacancyId: number;
+    id: string;
+    tenantId: string;
+    candidateId: string;
+    vacancyId: string;
     overallScore: number;
     technicalScore: number;
     communicationScore: number;
@@ -189,16 +518,75 @@ interface Evaluation {
     recommendation: 'proceed' | 'reject' | 'clarify';
     feedback: string;
     analysisData: Record<string, any>;
+    llmProviderUsed: string;
+    processingTimeMs: number;
     createdAt: Date;
 }
 ```
 
-#### AudioProcessingService
+#### LLMProviderService
+```typescript
+interface LLMProviderService {
+    generateResponse(tenantId: string, prompt: string, options?: LLMOptions): Promise<string>;
+    validateApiKey(provider: string, apiKey: string): Promise<boolean>;
+    getAvailableModels(provider: string, apiKey: string): Promise<string[]>;
+    estimateCost(provider: string, model: string, promptLength: number): Promise<number>;
+    getProviderStatus(tenantId: string): Promise<ProviderStatus>;
+}
+
+interface LLMOptions {
+    maxTokens?: number;
+    temperature?: number;
+    model?: string;
+}
+
+interface ProviderStatus {
+    provider: string;
+    isActive: boolean;
+    lastUsed?: Date;
+    totalUsage: number;
+    errorRate: number;
+    averageResponseTime: number;
+}
+```
+
+#### TelegramBotService
+```typescript
+interface TelegramBotService {
+    registerTenantBot(tenantId: string, botToken: string): Promise<void>;
+    updateWebhook(tenantId: string, webhookUrl: string): Promise<void>;
+    sendMessage(tenantId: string, chatId: number, message: string, options?: MessageOptions): Promise<void>;
+    sendVacancyButtons(tenantId: string, chatId: number, vacancies: Vacancy[]): Promise<void>;
+    handleIncomingMessage(tenantId: string, message: TelegramMessage): Promise<void>;
+    validateBotToken(botToken: string): Promise<boolean>;
+    getBotInfo(botToken: string): Promise<BotInfo>;
+}
+
+interface BotInfo {
+    id: number;
+    username: string;
+    firstName: string;
+    canJoinGroups: boolean;
+    canReadAllGroupMessages: boolean;
+    supportsInlineQueries: boolean;
+}
+
+interface MessageOptions {
+    replyMarkup?: InlineKeyboard;
+    parseMode?: 'HTML' | 'Markdown';
+    disableWebPagePreview?: boolean;
+}
+```
+
+#### Tenant-Aware AudioProcessingService
 ```typescript
 interface AudioProcessingService {
-    processAudioMessage(audioBuffer: Buffer, fileId: string): Promise<AudioProcessingResult>;
-    saveAudioFile(buffer: Buffer, filename: string): Promise<string>;
-    transcribeAudio(filePath: string): Promise<string>;
+    processAudioMessage(tenantId: string, audioBuffer: Buffer, fileId: string): Promise<AudioProcessingResult>;
+    saveAudioFile(tenantId: string, buffer: Buffer, filename: string): Promise<string>;
+    transcribeAudio(tenantId: string, filePath: string): Promise<string>;
+    getAudioFileUrl(tenantId: string, filePath: string): Promise<string>;
+    deleteAudioFile(tenantId: string, filePath: string): Promise<void>;
+    getTenantStorageUsage(tenantId: string): Promise<StorageUsage>;
 }
 
 interface AudioProcessingResult {
@@ -206,40 +594,66 @@ interface AudioProcessingResult {
     transcription: string;
     duration?: number;
     confidence?: number;
+    processingTimeMs: number;
+}
+
+interface StorageUsage {
+    totalSizeMB: number;
+    totalFiles: number;
+    oldestFile: Date;
+    newestFile: Date;
 }
 ```
 
-### Admin Panel Architecture (Next.js + TypeScript + Tailwind)
+### Individual User Dashboard Architecture (Next.js + TypeScript + Tailwind)
 
-The admin panel is built as a separate Next.js application with the following structure:
+The SaaS platform provides individual dashboards for each customer, built as a multi-tenant Next.js application:
 
 ```
-admin-panel/
+user-dashboard/
 ├── src/
 │   ├── app/                    # App Router (Next.js 13+)
 │   │   ├── (auth)/
 │   │   │   ├── login/
+│   │   │   ├── register/
+│   │   │   ├── forgot-password/
+│   │   │   ├── verify-email/
 │   │   │   └── layout.tsx
-│   │   ├── dashboard/
-│   │   │   ├── page.tsx
+│   │   ├── (dashboard)/
+│   │   │   ├── dashboard/      # Main dashboard
+│   │   │   │   ├── page.tsx
+│   │   │   │   └── analytics/
+│   │   │   ├── vacancies/      # Vacancy management
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── [id]/
+│   │   │   │   ├── create/
+│   │   │   │   └── edit/[id]/
+│   │   │   ├── candidates/     # Candidate management
+│   │   │   │   ├── page.tsx
+│   │   │   │   ├── [id]/
+│   │   │   │   └── evaluations/
+│   │   │   ├── integrations/   # Bot & LLM configuration
+│   │   │   │   ├── telegram/
+│   │   │   │   ├── llm-providers/
+│   │   │   │   └── settings/
+│   │   │   ├── subscription/   # Billing & usage
+│   │   │   │   ├── billing/
+│   │   │   │   ├── usage/
+│   │   │   │   └── plans/
+│   │   │   ├── account/        # Account settings
+│   │   │   │   ├── profile/
+│   │   │   │   ├── team/
+│   │   │   │   └── security/
 │   │   │   └── layout.tsx
-│   │   ├── vacancies/
-│   │   │   ├── page.tsx
-│   │   │   ├── [id]/
-│   │   │   ├── create/
-│   │   │   └── edit/[id]/
-│   │   ├── candidates/
-│   │   │   ├── page.tsx
-│   │   │   ├── [id]/
-│   │   │   └── evaluations/
-│   │   ├── reports/
-│   │   │   ├── page.tsx
-│   │   │   └── analytics/
-│   │   ├── api/                # API Routes
+│   │   ├── api/                # API Routes with tenant context
 │   │   │   ├── auth/
+│   │   │   ├── tenant/
 │   │   │   ├── vacancies/
 │   │   │   ├── candidates/
-│   │   │   └── evaluations/
+│   │   │   ├── evaluations/
+│   │   │   ├── integrations/
+│   │   │   ├── subscription/
+│   │   │   └── webhook/
 │   │   ├── globals.css
 │   │   └── layout.tsx
 │   ├── components/
@@ -249,56 +663,86 @@ admin-panel/
 │   │   │   ├── Modal.tsx
 │   │   │   ├── Table.tsx
 │   │   │   ├── Form.tsx
-│   │   │   └── Charts.tsx
+│   │   │   ├── Charts.tsx
+│   │   │   ├── Badge.tsx
+│   │   │   └── Toast.tsx
 │   │   ├── layout/
 │   │   │   ├── Sidebar.tsx
 │   │   │   ├── Header.tsx
-│   │   │   └── Navigation.tsx
+│   │   │   ├── Navigation.tsx
+│   │   │   ├── TenantSwitcher.tsx
+│   │   │   └── UserMenu.tsx
+│   │   ├── auth/
+│   │   │   ├── LoginForm.tsx
+│   │   │   ├── RegisterForm.tsx
+│   │   │   └── ProtectedRoute.tsx
 │   │   ├── vacancies/
 │   │   │   ├── VacancyForm.tsx
 │   │   │   ├── VacancyList.tsx
-│   │   │   └── VacancyCard.tsx
+│   │   │   ├── VacancyCard.tsx
+│   │   │   └── VacancyAnalytics.tsx
 │   │   ├── candidates/
 │   │   │   ├── CandidateList.tsx
 │   │   │   ├── CandidateProfile.tsx
-│   │   │   └── EvaluationReport.tsx
+│   │   │   ├── EvaluationReport.tsx
+│   │   │   └── ConversationHistory.tsx
+│   │   ├── integrations/
+│   │   │   ├── TelegramBotSetup.tsx
+│   │   │   ├── LLMProviderConfig.tsx
+│   │   │   ├── APIKeyManager.tsx
+│   │   │   └── WebhookStatus.tsx
+│   │   ├── subscription/
+│   │   │   ├── PlanSelector.tsx
+│   │   │   ├── UsageMetrics.tsx
+│   │   │   ├── BillingHistory.tsx
+│   │   │   └── UsageLimits.tsx
 │   │   └── dashboard/
 │   │       ├── StatsCards.tsx
 │   │       ├── RecentActivity.tsx
-│   │       └── Charts.tsx
+│   │       ├── Charts.tsx
+│   │       └── QuickActions.tsx
 │   ├── lib/
-│   │   ├── api.ts              # API client
+│   │   ├── api.ts              # Tenant-aware API client
 │   │   ├── auth.ts             # Authentication utilities
+│   │   ├── tenant-context.ts   # Tenant context management
 │   │   ├── utils.ts            # Utility functions
-│   │   └── validations.ts      # Form validation schemas
+│   │   ├── validations.ts      # Form validation schemas
+│   │   └── encryption.ts       # Client-side encryption helpers
 │   ├── types/
 │   │   ├── api.ts              # API response types
 │   │   ├── auth.ts             # Authentication types
+│   │   ├── tenant.ts           # Tenant-specific types
 │   │   └── models.ts           # Data model types
-│   └── hooks/
-│       ├── useAuth.ts
-│       ├── useApi.ts
-│       └── useLocalStorage.ts
+│   ├── hooks/
+│   │   ├── useAuth.ts
+│   │   ├── useTenant.ts
+│   │   ├── useApi.ts
+│   │   ├── useSubscription.ts
+│   │   └── useLocalStorage.ts
+│   └── middleware.ts           # Tenant routing middleware
 ├── public/
 ├── tailwind.config.js
 ├── next.config.js
 └── package.json
 ```
 
-#### Key Components Design
+#### Key SaaS Components Design
 
-**Dashboard Layout**
+**Tenant-Aware Dashboard Layout**
 ```typescript
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+  const { tenant, user } = useTenant();
+  const { subscription, usage } = useSubscription();
+  
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar />
+      <Sidebar tenant={tenant} subscription={subscription} />
       <div className="lg:pl-64">
-        <Header />
+        <Header user={user} tenant={tenant} usage={usage} />
         <main className="py-6">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             {children}
@@ -306,6 +750,212 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </main>
       </div>
     </div>
+  );
+};
+```
+
+**Telegram Bot Configuration Component**
+```typescript
+interface TelegramBotSetupProps {
+  tenantId: string;
+  currentConfig?: TenantConfiguration;
+  onConfigUpdate: (config: TenantConfiguration) => void;
+}
+
+const TelegramBotSetup: React.FC<TelegramBotSetupProps> = ({ 
+  tenantId, 
+  currentConfig, 
+  onConfigUpdate 
+}) => {
+  const [botToken, setBotToken] = useState(currentConfig?.telegramBotToken || '');
+  const [isValidating, setIsValidating] = useState(false);
+  const [botInfo, setBotInfo] = useState<BotInfo | null>(null);
+  
+  const validateAndSaveToken = async () => {
+    setIsValidating(true);
+    try {
+      const isValid = await telegramBotService.validateBotToken(botToken);
+      if (isValid) {
+        const info = await telegramBotService.getBotInfo(botToken);
+        setBotInfo(info);
+        
+        const updatedConfig = await tenantService.updateTenantConfiguration(tenantId, {
+          telegramBotToken: botToken,
+          telegramWebhookUrl: `${process.env.NEXT_PUBLIC_API_URL}/webhook/${tenantId}`
+        });
+        
+        onConfigUpdate(updatedConfig);
+        toast.success('Bot token validated and saved successfully!');
+      } else {
+        toast.error('Invalid bot token. Please check and try again.');
+      }
+    } catch (error) {
+      toast.error('Failed to validate bot token.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+  
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-medium mb-4">Telegram Bot Configuration</h3>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Bot Token
+          </label>
+          <div className="flex space-x-2">
+            <Input
+              type="password"
+              value={botToken}
+              onChange={(e) => setBotToken(e.target.value)}
+              placeholder="Enter your Telegram bot token"
+              className="flex-1"
+            />
+            <Button
+              onClick={validateAndSaveToken}
+              disabled={!botToken || isValidating}
+              loading={isValidating}
+            >
+              Validate & Save
+            </Button>
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Get your bot token from @BotFather on Telegram
+          </p>
+        </div>
+        
+        {botInfo && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+            <h4 className="font-medium text-green-800">Bot Information</h4>
+            <div className="mt-2 text-sm text-green-700">
+              <p><strong>Username:</strong> @{botInfo.username}</p>
+              <p><strong>Name:</strong> {botInfo.firstName}</p>
+              <p><strong>ID:</strong> {botInfo.id}</p>
+            </div>
+          </div>
+        )}
+        
+        <WebhookStatus tenantId={tenantId} />
+      </div>
+    </Card>
+  );
+};
+```
+
+**LLM Provider Configuration Component**
+```typescript
+interface LLMProviderConfigProps {
+  tenantId: string;
+  currentConfig?: TenantConfiguration;
+  onConfigUpdate: (config: TenantConfiguration) => void;
+}
+
+const LLMProviderConfig: React.FC<LLMProviderConfigProps> = ({
+  tenantId,
+  currentConfig,
+  onConfigUpdate
+}) => {
+  const [selectedProvider, setSelectedProvider] = useState(currentConfig?.llmProvider || 'openai');
+  const [apiKey, setApiKey] = useState('');
+  const [selectedModel, setSelectedModel] = useState(currentConfig?.llmModel || '');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isValidating, setIsValidating] = useState(false);
+  
+  const providers = [
+    { value: 'openai', label: 'OpenAI', models: ['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
+    { value: 'claude', label: 'Anthropic Claude', models: ['claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'] },
+    { value: 'google', label: 'Google AI', models: ['gemini-pro', 'gemini-pro-vision'] },
+    { value: 'azure', label: 'Azure OpenAI', models: ['gpt-4', 'gpt-35-turbo'] }
+  ];
+  
+  const validateAndSaveConfig = async () => {
+    setIsValidating(true);
+    try {
+      const isValid = await llmProviderService.validateApiKey(selectedProvider, apiKey);
+      if (isValid) {
+        const models = await llmProviderService.getAvailableModels(selectedProvider, apiKey);
+        setAvailableModels(models);
+        
+        const updatedConfig = await tenantService.updateTenantConfiguration(tenantId, {
+          llmProvider: selectedProvider,
+          llmModel: selectedModel || models[0],
+          llmApiKeyEncrypted: apiKey // Will be encrypted on the backend
+        });
+        
+        onConfigUpdate(updatedConfig);
+        toast.success('LLM provider configuration saved successfully!');
+      } else {
+        toast.error('Invalid API key. Please check and try again.');
+      }
+    } catch (error) {
+      toast.error('Failed to validate API key.');
+    } finally {
+      setIsValidating(false);
+    }
+  };
+  
+  return (
+    <Card className="p-6">
+      <h3 className="text-lg font-medium mb-4">LLM Provider Configuration</h3>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Provider
+          </label>
+          <Select
+            value={selectedProvider}
+            onValueChange={setSelectedProvider}
+          >
+            {providers.map((provider) => (
+              <SelectItem key={provider.value} value={provider.value}>
+                {provider.label}
+              </SelectItem>
+            ))}
+          </Select>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            API Key
+          </label>
+          <Input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={`Enter your ${providers.find(p => p.value === selectedProvider)?.label} API key`}
+          />
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Model
+          </label>
+          <Select
+            value={selectedModel}
+            onValueChange={setSelectedModel}
+            disabled={!availableModels.length}
+          >
+            {(availableModels.length ? availableModels : providers.find(p => p.value === selectedProvider)?.models || []).map((model) => (
+              <SelectItem key={model} value={model}>
+                {model}
+              </SelectItem>
+            ))}
+          </Select>
+        </div>
+        
+        <Button
+          onClick={validateAndSaveConfig}
+          disabled={!apiKey || isValidating}
+          loading={isValidating}
+          className="w-full"
+        >
+          Validate & Save Configuration
+        </Button>
+      </div>
+    </Card>
   );
 };
 ```
@@ -813,47 +1463,93 @@ describe('Bot Integration', () => {
 - Authentication and authorization
 - Data encryption verification
 
-## Docker Containerization Architecture
+## SaaS Multi-Tenant Docker Architecture
 
 ### Container Structure
 
-The system is designed to run in a multi-container Docker environment with the following services:
+The SaaS platform is designed to run in a scalable, multi-container Docker environment optimized for multi-tenancy:
 
 ```mermaid
 graph TB
-    subgraph "Docker Compose Environment"
-        subgraph "Application Containers"
-            BOT[Telegram Bot Service]
-            ADMIN[Admin Panel Service]
-            API[API Gateway/Backend]
+    subgraph "SaaS Docker Environment"
+        subgraph "Load Balancer & Proxy"
+            LB[Nginx Load Balancer]
+            PROXY[Reverse Proxy]
         end
         
-        subgraph "Data Containers"
-            DB[(PostgreSQL Database)]
-            REDIS[(Redis Cache)]
+        subgraph "Core SaaS Services"
+            AUTH[Authentication Service]
+            TENANT[Tenant Management Service]
+            BILLING[Billing Service]
+            WEBHOOK[Webhook Router Service]
         end
         
-        subgraph "External Services"
-            OLLAMA[Ollama LLM Service]
-            NGINX[Nginx Reverse Proxy]
+        subgraph "Business Logic Services"
+            BOT[Multi-Tenant Bot Handlers]
+            DASHBOARD[User Dashboard Service]
+            API[API Gateway Service]
+            ANALYSIS[Analysis Service]
+            AUDIO[Audio Processing Service]
         end
         
-        subgraph "Storage"
-            AUDIO[Audio Files Volume]
-            LOGS[Logs Volume]
+        subgraph "Data Layer"
+            DB[(Multi-Tenant PostgreSQL)]
+            REDIS[(Redis Cache & Sessions)]
+            VAULT[Secrets Vault]
+        end
+        
+        subgraph "External Integrations"
+            OPENAI[OpenAI API]
+            CLAUDE[Claude API]
+            STRIPE[Stripe API]
+            EMAIL[Email Service]
+        end
+        
+        subgraph "Storage Volumes"
+            TENANT_AUDIO[Tenant-Isolated Audio Storage]
+            LOGS[Application Logs]
+            BACKUPS[Database Backups]
         end
     end
     
-    BOT --> API
-    ADMIN --> API
-    API --> DB
-    API --> REDIS
-    API --> OLLAMA
-    NGINX --> BOT
-    NGINX --> ADMIN
-    API --> AUDIO
+    LB --> PROXY
+    PROXY --> DASHBOARD
+    PROXY --> BOT
+    PROXY --> API
+    PROXY --> WEBHOOK
+    
+    DASHBOARD --> AUTH
+    BOT --> AUTH
+    API --> AUTH
+    WEBHOOK --> AUTH
+    
+    AUTH --> TENANT
+    BILLING --> STRIPE
+    
+    BOT --> ANALYSIS
+    BOT --> AUDIO
+    ANALYSIS --> OPENAI
+    ANALYSIS --> CLAUDE
+    AUDIO --> TENANT_AUDIO
+    
+    AUTH --> DB
+    TENANT --> DB
+    BOT --> DB
+    DASHBOARD --> DB
+    BILLING --> DB
+    
+    AUTH --> REDIS
+    TENANT --> REDIS
+    BOT --> REDIS
+    
+    TENANT --> VAULT
+    ANALYSIS --> VAULT
+    
+    API --> LOGS
     BOT --> LOGS
-    ADMIN --> LOGS
+    DASHBOARD --> LOGS
+    
+    DB --> BACKUPS
 ```
 
 ### Docker Configuration Files
@@ -952,200 +1648,299 @@ ENV HOSTNAME "0.0.0.0"
 CMD ["node", "server.js"]
 ```
 
-**Docker Compose Configuration**
+**SaaS Docker Compose Configuration**
 ```yaml
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # Multi-Tenant PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: hr-bot-postgres
+    container_name: saas-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-hr_bot}
-      POSTGRES_USER: ${DB_USER:-hr_user}
+      POSTGRES_DB: ${DB_NAME:-hr_saas}
+      POSTGRES_USER: ${DB_USER:-saas_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d
+      - ./database/init-multi-tenant.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./database/rls-policies.sql:/docker-entrypoint-initdb.d/02-rls.sql
     ports:
       - "5432:5432"
     networks:
-      - hr-bot-network
+      - saas-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-hr_user} -d ${DB_NAME:-hr_bot}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-saas_user} -d ${DB_NAME:-hr_saas}"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Redis Cache
+  # Redis for Sessions and Cache
   redis:
     image: redis:7-alpine
-    container_name: hr-bot-redis
-    command: redis-server --appendonly yes
+    container_name: saas-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_data:/data
     ports:
       - "6379:6379"
     networks:
-      - hr-bot-network
+      - saas-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 30s
       timeout: 10s
       retries: 3
 
-  # Ollama LLM Service
-  ollama:
-    image: ollama/ollama:latest
-    container_name: hr-bot-ollama
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    networks:
-      - hr-bot-network
+  # HashiCorp Vault for Secrets Management
+  vault:
+    image: vault:latest
+    container_name: saas-vault
     environment:
-      - OLLAMA_HOST=0.0.0.0
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - VAULT_DEV_ROOT_TOKEN_ID=${VAULT_ROOT_TOKEN}
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    ports:
+      - "8200:8200"
+    networks:
+      - saas-network
+    cap_add:
+      - IPC_LOCK
 
-  # Telegram Bot Service
-  telegram-bot:
+  # Authentication Service
+  auth-service:
     build:
-      context: .
+      context: ./services/auth
       dockerfile: Dockerfile
-    container_name: hr-bot-telegram
+    container_name: saas-auth
     environment:
       - NODE_ENV=production
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - DATABASE_URL=postgresql://${DB_USER:-hr_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_bot}
+      - DATABASE_URL=postgresql://${DB_USER:-saas_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_saas}
       - REDIS_URL=redis://redis:6379
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma2:latest}
-      - SPEECH_TO_TEXT_API_KEY=${SPEECH_TO_TEXT_API_KEY}
-      - AUDIO_STORAGE_PATH=/app/storage/audio
-    volumes:
-      - audio_files:/app/storage/audio
-      - bot_logs:/app/logs
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - VAULT_URL=http://vault:8200
+      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-      ollama:
-        condition: service_healthy
     networks:
-      - hr-bot-network
+      - saas-network
     restart: unless-stopped
 
-  # Admin Panel Service
-  admin-panel:
+  # Tenant Management Service
+  tenant-service:
     build:
-      context: .
-      dockerfile: admin-panel/Dockerfile
-    container_name: hr-bot-admin
+      context: ./services/tenant
+      dockerfile: Dockerfile
+    container_name: saas-tenant
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${DB_USER:-hr_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_bot}
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
-      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3001}
-      - API_BASE_URL=http://telegram-bot:3000
-    ports:
-      - "3001:3000"
+      - DATABASE_URL=postgresql://${DB_USER:-saas_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_saas}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - VAULT_URL=http://vault:8200
+      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
     depends_on:
       postgres:
         condition: service_healthy
-      telegram-bot:
+      redis:
+        condition: service_healthy
+      vault:
         condition: service_started
     networks:
-      - hr-bot-network
+      - saas-network
     restart: unless-stopped
 
-  # Nginx Reverse Proxy
+  # Multi-Tenant Bot Service
+  bot-service:
+    build:
+      context: ./services/bot
+      dockerfile: Dockerfile
+    container_name: saas-bot
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER:-saas_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_saas}
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - VAULT_URL=http://vault:8200
+      - VAULT_TOKEN=${VAULT_ROOT_TOKEN}
+      - AUDIO_STORAGE_PATH=/app/storage
+    volumes:
+      - tenant_audio_storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      tenant-service:
+        condition: service_started
+    networks:
+      - saas-network
+    restart: unless-stopped
+
+  # User Dashboard Service
+  dashboard-service:
+    build:
+      context: ./services/dashboard
+      dockerfile: Dockerfile
+    container_name: saas-dashboard
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER:-saas_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_saas}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - API_BASE_URL=http://api-gateway:3000
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - saas-network
+    restart: unless-stopped
+
+  # API Gateway Service
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: saas-api
+    environment:
+      - NODE_ENV=production
+      - AUTH_SERVICE_URL=http://auth-service:3000
+      - TENANT_SERVICE_URL=http://tenant-service:3000
+      - BOT_SERVICE_URL=http://bot-service:3000
+      - BILLING_SERVICE_URL=http://billing-service:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - auth-service
+      - tenant-service
+      - bot-service
+    networks:
+      - saas-network
+    restart: unless-stopped
+
+  # Billing Service
+  billing-service:
+    build:
+      context: ./services/billing
+      dockerfile: Dockerfile
+    container_name: saas-billing
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${DB_USER:-saas_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-hr_saas}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - saas-network
+    restart: unless-stopped
+
+  # Nginx Load Balancer & Reverse Proxy
   nginx:
     image: nginx:alpine
-    container_name: hr-bot-nginx
+    container_name: saas-nginx
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/saas-nginx.conf:/etc/nginx/nginx.conf
       - ./nginx/ssl:/etc/nginx/ssl
     depends_on:
-      - admin-panel
+      - dashboard-service
+      - api-gateway
+      - bot-service
     networks:
-      - hr-bot-network
+      - saas-network
     restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
-  ollama_data:
-  audio_files:
-  bot_logs:
+  tenant_audio_storage:
+  saas_logs:
+  vault_data:
+  database_backups:
 
 networks:
-  hr-bot-network:
+  saas-network:
     driver: bridge
 ```
 
-**Environment Configuration (.env.production)**
+**SaaS Environment Configuration (.env.production)**
 ```bash
 # Database Configuration
-DB_NAME=hr_bot
-DB_USER=hr_user
-DB_PASSWORD=your_secure_password_here
-
-# Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-
-# LLM Configuration
-LLM_PROVIDER=claude  # Options: ollama, claude, openai, azure
-LLM_MODEL=claude-3-sonnet-20240229
-LLM_API_KEY=your_claude_api_key_here  # Required for external providers
-LLM_MAX_TOKENS=2048
-LLM_TEMPERATURE=0.7
-
-# Ollama Configuration (only if LLM_PROVIDER=ollama)
-OLLAMA_BASE_URL=http://ollama:11434
-
-# Speech-to-Text Configuration
-SPEECH_TO_TEXT_PROVIDER=google
-SPEECH_TO_TEXT_API_KEY=your_speech_api_key_here
-
-# Admin Panel Configuration
-NEXTAUTH_SECRET=your_nextauth_secret_here
-NEXTAUTH_URL=http://localhost:3001
-
-# Security
-JWT_SECRET=your_jwt_secret_here
+DB_NAME=hr_saas
+DB_USER=saas_user
+DB_PASSWORD=your_secure_database_password_here
 
 # Redis Configuration
-REDIS_URL=redis://redis:6379
-REDIS_TTL=3600NAME=hr_bot
-DB_USER=hr_user
-DB_PASSWORD=your_secure_password_here
+REDIS_PASSWORD=your_secure_redis_password_here
 
-# Telegram Bot Configuration
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
+# Security & Authentication
+JWT_SECRET=your_jwt_secret_for_saas_platform_here
+NEXTAUTH_SECRET=your_nextauth_secret_for_dashboard_here
+NEXTAUTH_URL=https://yourdomain.com
 
-# Ollama Configuration
-OLLAMA_MODEL=gemma2:latest
+# Vault Configuration (Secrets Management)
+VAULT_ROOT_TOKEN=your_vault_root_token_here
+VAULT_UNSEAL_KEY=your_vault_unseal_key_here
 
-# Speech-to-Text Configuration
-SPEECH_TO_TEXT_PROVIDER=google
-SPEECH_TO_TEXT_API_KEY=your_speech_api_key_here
+# Stripe Configuration (Billing)
+STRIPE_SECRET_KEY=sk_live_your_stripe_secret_key_here
+STRIPE_PUBLISHABLE_KEY=pk_live_your_stripe_publishable_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_stripe_webhook_secret_here
 
-# Admin Panel Configuration
-NEXTAUTH_SECRET=your_nextauth_secret_here
-NEXTAUTH_URL=http://localhost:3001
+# Default LLM Providers (for platform defaults)
+OPENAI_API_KEY=your_platform_openai_key_here
+CLAUDE_API_KEY=your_platform_claude_key_here
+GOOGLE_AI_API_KEY=your_platform_google_ai_key_here
 
-# Security
-JWT_SECRET=your_jwt_secret_here
+# Email Service Configuration
+EMAIL_SERVICE_PROVIDER=sendgrid  # Options: sendgrid, ses, mailgun
+EMAIL_API_KEY=your_email_service_api_key_here
+EMAIL_FROM_ADDRESS=noreply@yoursaasplatform.com
+EMAIL_FROM_NAME=Your SaaS Platform
+
+# Platform Configuration
+PLATFORM_NAME=AI HR Bot SaaS
+PLATFORM_DOMAIN=yoursaasplatform.com
+PLATFORM_SUPPORT_EMAIL=support@yoursaasplatform.com
+
+# File Storage Configuration
+STORAGE_PROVIDER=s3  # Options: local, s3, gcs
+AWS_ACCESS_KEY_ID=your_aws_access_key_here
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key_here
+AWS_S3_BUCKET=your-saas-audio-storage-bucket
+AWS_REGION=us-east-1
+
+# Monitoring & Logging
+LOG_LEVEL=info
+SENTRY_DSN=your_sentry_dsn_for_error_tracking
+ANALYTICS_SERVICE=mixpanel  # Options: mixpanel, amplitude, google
+ANALYTICS_API_KEY=your_analytics_api_key_here
+
+# Rate Limiting
+RATE_LIMIT_WINDOW_MS=900000  # 15 minutes
+RATE_LIMIT_MAX_REQUESTS=100
+
+# Webhook Configuration
+WEBHOOK_BASE_URL=https://api.yoursaasplatform.com
+WEBHOOK_SECRET=your_webhook_secret_for_verification
+
+# Development/Staging Overrides (remove in production)
+# NODE_ENV=development
+# LOG_LEVEL=debug
+# STRIPE_SECRET_KEY=sk_test_your_stripe_test_key_here
 ```
 
 **Nginx Configuration**
